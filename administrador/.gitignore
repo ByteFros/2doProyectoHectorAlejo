@@ -1,0 +1,37 @@
+# Archivos de Python
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.sqlite3
+
+# Configuración del entorno virtual
+venv/
+env/
+*.env
+
+# Configuración del IDE y editor de código
+.vscode/
+.idea/
+*.swp
+
+# Archivos de logs
+logs/
+*.log
+
+# Archivos de caché y migraciones temporales
+db.sqlite3
+*.pyc
+*.pyo
+__pycache__/
+*.log
+
+# Archivos de media y estáticos generados
+staticfiles/
+media/
+
+# Archivos de Docker y despliegue (si usas Docker)
+docker-compose.override.yml
+
+# Dependencias instaladas localmente
+node_modules/
