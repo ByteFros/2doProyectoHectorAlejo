@@ -1,15 +1,14 @@
-version: '3.8'
-
 services:
   web:
-    build: ./administrador  # Construye la imagen usando el Dockerfile en 'administrador/'
-    container_name: django_app
-    restart: always
+    build: .
     ports:
       - "8000:8000"
     volumes:
-      - ./administrador:/app  # Monta el código del backend para reflejar cambios en tiempo real
-      - sqlite_data:/app/db_data  # Almacena la base de datos SQLite de manera persistente
+      - .:/app  # Monta todo el proyecto en /app
+      - sqlite_data:/app/db_data
+    environment:
+      - DEBUG=True
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
 
 volumes:
   sqlite_data:
