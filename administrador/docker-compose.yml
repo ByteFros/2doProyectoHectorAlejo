@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  web:
+    build: ./administrador  # Construye la imagen usando el Dockerfile en 'administrador/'
+    container_name: django_app
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./administrador:/app  # Monta el código del backend para reflejar cambios en tiempo real
+      - sqlite_data:/app/db_data  # Almacena la base de datos SQLite de manera persistente
+
+volumes:
+  sqlite_data:
