@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-
+import os
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -42,10 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'users',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
+    'users',
 ]
 
 REST_FRAMEWORK = {
@@ -90,6 +90,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'administrador.wsgi.application'
 
 
+
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
@@ -99,6 +100,8 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+
 
 
 # Password validation
@@ -134,9 +137,11 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # 🔹 Aquí se almacenarán los archivos subidos
 
-STATIC_URL = 'static/'
-
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -146,5 +151,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.CustomUser'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Puerto donde correrá React
+    "http://localhost:5173",
+    "http://localhost:5174",
 ]
+
+CORS_ALLOW_CREDENTIALS = True  # ✅ Permitir envío de cookies
+SESSION_COOKIE_SAMESITE = "None"  # ✅ Permitir cookies cross-site
+SESSION_COOKIE_SECURE = False  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "alejo1123581321@gmail.com"  # ⚠️ Cambia esto por tu correo
+EMAIL_HOST_PASSWORD = "xrng sdpb jzdy xhxg"  # ⚠️ Usa una contraseña de aplicación
+
