@@ -156,10 +156,13 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # ✅ Permitir envío de cookies
-SESSION_COOKIE_SAMESITE = "None"  # ✅ Permitir cookies cross-site
-SESSION_COOKIE_SECURE = False  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
+
 CSRF_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SAMESITE = "None"  # ✅ Permitir cookies cross-site
+
 CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = False  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
+
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"

@@ -100,10 +100,9 @@ class Viaje(models.Model):
 
     ESTADO_CHOICES = [
         ("PENDIENTE", "Pendiente"),
-        ("APROBADO", "Aprobado"),
-        ("RECHAZADO", "Rechazado"),
         ("EN_CURSO", "En curso"),
         ("FINALIZADO", "Finalizado"),
+        ("CANCELADO", "Cancelado"),
     ]
 
     empleado = models.ForeignKey(EmpleadoProfile, on_delete=models.CASCADE)
@@ -113,6 +112,9 @@ class Viaje(models.Model):
     fecha_fin = models.DateField()
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="PENDIENTE")
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    dias_viajados = models.PositiveIntegerField(default = 1)  # 🔹 Días de viaje
+    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)  # 🔹 Empresa visitada
+    motivo = models.TextField(max_length=500, default="No se ha declarado el motivo por parte del empleado")  # 🔹 Motivo del viaje
 
     def __str__(self):
         return f"{self.empleado.nombre} viaja a {self.destino} ({self.estado})"
@@ -154,3 +156,14 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.usuario_destino}"
+
+
+
+class Notas(models.Model):
+    viaje = models.ForeignKey("Viaje", on_delete=models.CASCADE, related_name="notas")
+    empleado = models.ForeignKey("EmpleadoProfile", on_delete=models.CASCADE)
+    contenido = models.TextField(max_length=500)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Nota para viaje {self.viaje.id} - {self.fecha_creacion.strftime('%Y-%m-%d')}"

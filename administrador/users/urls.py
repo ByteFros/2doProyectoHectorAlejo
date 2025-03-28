@@ -1,12 +1,14 @@
 from django.urls import path
 
 from .auth_views import LoginView, LogoutView, RegisterUserView
-from .empresa_views import EliminarEmpresaView, EliminarEmpleadoView, ListarEmpresasView, RegisterEmpresaView, \
-    UpdatePermissionsEmpresa, RegisterEmployeeView, BatchRegisterEmployeesView
-from .gastos_views import CrearGastoView, AprobarRechazarGastoView, GastoListView
+from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
+    RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView
+from .gastos_views import CrearGastoView, AprobarRechazarGastoView, GastoListView, GastoUpdateDeleteView, \
+    GastoComprobanteDownloadView
+from .notas_views import NotaViajeListCreateView, NotaViajeDeleteView
 from .notificaciones_views import ListaNotificacionesView, CrearNotificacionView
 from .viajes_views import CrearViajeView, AprobarRechazarViajeView, FinalizarViajeView, IniciarViajeView, \
-    ListarViajesPendientesView, ListarViajesAprobadosView, ListarViajesFinalizadosView, ListarTodosLosViajesView
+    ListarViajesFinalizadosView, ListarTodosLosViajesView, CancelarViajeView, ViajeEnCursoView
 from .views import UserDetailView, EmployeeListView, PasswordResetRequestView, \
     PasswordResetConfirmView, ChangePasswordView
 
@@ -22,25 +24,26 @@ urlpatterns = [
     # Usuarios y empresas
     path('profile/', UserDetailView.as_view(), name='profile'),
     path('empleados/', EmployeeListView.as_view(), name='empleados'),
-    path('empresas/<int:empresa_id>/', EliminarEmpresaView.as_view(), name='eliminar_empresa'),
     path('empleados/<str:dni>/', EliminarEmpleadoView.as_view(), name='eliminar_empleado'),
-    path('empresas/<int:empresa_id>/permisos/', UpdatePermissionsEmpresa.as_view(), name='actualizar_permiso_empresa'),
-    path('listar/empresas/', ListarEmpresasView.as_view(), name='listar_empresas'),
+    path('empresas2/', EmpresaManagementView.as_view(), name='gestionar_empresas'),  # GET
+    path('empresas2/<int:empresa_id>/', EmpresaManagementView.as_view(), name='gestionar_una_empresa'),  # PUT & DELETE
 
     # Gastos
     path('gastos/', GastoListView.as_view(), name='lista_gastos'),
-    path('gastos/nuevo/', CrearGastoView.as_view(), name='nuevo_gasto'),
+    path('gastos/new/', CrearGastoView.as_view(), name='nuevo_gasto'),
     path('gastos/<int:gasto_id>/', AprobarRechazarGastoView.as_view(), name='aprobar_rechazar_gasto'),
+    path("gastos/edit/<int:gasto_id>/", GastoUpdateDeleteView.as_view(), name="gasto_crud"),
+    path("gastos/<int:gasto_id>/file/", GastoComprobanteDownloadView.as_view(), name="gasto_archivo"),
 
     # Viajes
-    path("viajes/nuevo/", CrearViajeView.as_view(), name="nuevo_viaje"),
+    path("viajes/new/", CrearViajeView.as_view(), name="nuevo_viaje"),
     path("viajes/<int:viaje_id>/", AprobarRechazarViajeView.as_view(), name="aprobar_rechazar_viaje"),
     path("viajes/<int:viaje_id>/iniciar/", IniciarViajeView.as_view(), name="iniciar_viaje"),
     path("viajes/<int:viaje_id>/end/", FinalizarViajeView.as_view(), name="finalizar_viaje"),
-    path("viajes/pendientes/", ListarViajesPendientesView.as_view(), name="listar_viajes_pendientes"),
-    path("viajes/aprobados/", ListarViajesAprobadosView.as_view(), name="viajes_aprobados"),
-    path("viajes/list/over/", ListarViajesFinalizadosView.as_view(), name="viajes_aprobados"),
+    path("viajes/over/", ListarViajesFinalizadosView.as_view(), name="viajes_aprobados"),
+    path("viajes/en-curso/", ViajeEnCursoView.as_view(), name="viaje_en_curso"),
     path("viajes/all/", ListarTodosLosViajesView.as_view(), name="viajes_todos"),
+    path("viajes/<int:viaje_id>/cancelar/", CancelarViajeView.as_view(), name="cancel"),
 
     # Contraseña
     path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
@@ -50,6 +53,10 @@ urlpatterns = [
     #notificaciones
     path("notificaciones/",ListaNotificacionesView.as_view(), name="lista_notificaciones"),
     path("notificaciones/crear/", CrearNotificacionView.as_view(), name="crear_notificacion"),
+
+    #notas
+    path("notas/<int:viaje_id>/", NotaViajeListCreateView.as_view(), name="notas_viaje"),
+    path("notas/delete/<int:nota_id>/", NotaViajeDeleteView.as_view(), name="eliminar_nota")
 
 
 ]

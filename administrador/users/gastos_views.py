@@ -6,11 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Gasto, EmpleadoProfile, EmpresaProfile, Viaje
 from .serializers import GastoSerializer
+from django.http import FileResponse, Http404
 
-
-from rest_framework.parsers import MultiPartParser, FormParser
-
-from rest_framework.parsers import MultiPartParser, FormParser
 
 class CrearGastoView(APIView):
     """Permite a un empleado registrar un gasto en un viaje aprobado o finalizado"""
@@ -19,13 +16,16 @@ class CrearGastoView(APIView):
     parser_classes = (MultiPartParser, FormParser)  # ✅ Asegura que acepta archivos opcionales
 
     def post(self, request):
+
+        print("Data recibida" , request.data.dict())
+
         """Registrar un nuevo gasto"""
         if request.user.role != "EMPLEADO":
             return Response({"error": "Solo los empleados pueden registrar gastos"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
             empleado = EmpleadoProfile.objects.get(user=request.user)
-            data = request.data.copy()
+            data = request.data.dict()
             data["empleado_id"] = empleado.id
             data["empresa_id"] = empleado.empresa.id
 
@@ -33,8 +33,8 @@ class CrearGastoView(APIView):
             viaje_id = data.get("viaje_id")
             try:
                 viaje = Viaje.objects.get(id=viaje_id)
-                if viaje.estado not in ["APROBADO", "EN_CURSO", "FINALIZADO"]:
-                    return Response({"error": "Solo puedes registrar gastos en viajes aprobados o finalizados"}, status=400)
+                if viaje.estado not in ["EN_CURSO", "FINALIZADO"]:
+                    return Response({"error": "Solo puedes registrar gastos en viajes en curso o finalizados"}, status=400)
             except Viaje.DoesNotExist:
                 return Response({"error": "El viaje no existe"}, status=404)
 
@@ -111,3 +111,60 @@ class GastoListView(APIView):
 
         serializer = GastoSerializer(gastos, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+
+class GastoUpdateDeleteView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def patch(self, request, gasto_id):
+        try:
+            gasto = Gasto.objects.get(id=gasto_id, empleado__user=request.user)
+        except Gasto.DoesNotExist:
+            return Response({"error": "Gasto no encontrado o no autorizado"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = GastoSerializer(gasto, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, gasto_id):
+        try:
+            gasto = Gasto.objects.get(id=gasto_id, empleado__user=request.user)
+            gasto.delete()
+            return Response({"message": "Gasto eliminado correctamente"}, status=status.HTTP_200_OK)
+        except Gasto.DoesNotExist:
+            return Response({"error": "Gasto no encontrado o no autorizado"}, status=status.HTTP_404_NOT_FOUND)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from django.http import FileResponse, Http404
+from .models import Gasto
+import mimetypes
+
+
+class GastoComprobanteDownloadView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, gasto_id):
+        try:
+            gasto = Gasto.objects.get(id=gasto_id, empleado__user=request.user)
+            if not gasto.comprobante:
+                raise Http404("No hay archivo para este gasto")
+
+            # Detectar tipo MIME automáticamente
+            file_path = gasto.comprobante.path
+            content_type, _ = mimetypes.guess_type(file_path)
+            response = FileResponse(gasto.comprobante.open(), content_type=content_type or 'application/octet-stream')
+            response['Content-Disposition'] = f'inline; filename="{gasto.comprobante.name}"'
+            return response
+
+        except Gasto.DoesNotExist:
+            raise Http404("Gasto no encontrado o no autorizado")

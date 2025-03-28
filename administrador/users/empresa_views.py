@@ -57,24 +57,6 @@ class RegisterEmpresaView(APIView):
         except KeyError as e:
             return Response({"error": f"Falta el campo {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-class EliminarEmpresaView(APIView):
-    """Permite a un MASTER eliminar una empresa y sus empleados asociados"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def delete(self, request, empresa_id):
-        """🔹 El MASTER puede eliminar una empresa, sus empleados y los usuarios relacionados"""
-        if request.user.role != "MASTER":
-            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            empresa = EmpresaProfile.objects.get(id=empresa_id)
-            empresa.delete()  # ✅ Llama al método `delete` que maneja la eliminación de empleados y usuarios
-            return Response({"message": "Empresa eliminada correctamente."}, status=status.HTTP_204_NO_CONTENT)
-
-        except EmpresaProfile.DoesNotExist:
-            return Response({"error": "Empresa no encontrada."}, status=status.HTTP_404_NOT_FOUND)
-
 class EliminarEmpleadoView(APIView):
     """Permite a una EMPRESA eliminar a sus empleados"""
     authentication_classes = [TokenAuthentication]
@@ -86,46 +68,13 @@ class EliminarEmpleadoView(APIView):
             return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            empleado = EmpleadoProfile.objects.get(dni= dni, empresa__user=request.user)
+            empleado = EmpleadoProfile.objects.get(dni=dni, empresa__user=request.user)
             empleado.user.delete()
             empleado.delete()
             return Response({"message": "Empleado eliminado correctamente."}, status=status.HTTP_204_NO_CONTENT)
         except EmpleadoProfile.DoesNotExist:
             return Response({"error": "Empleado no encontrado o no pertenece a tu empresa."},
                             status=status.HTTP_404_NOT_FOUND)
-
-class ListarEmpresasView(APIView):
-    """Endpoint para obtener todas las empresas registradas"""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        empresas = EmpresaProfile.objects.all()  # 🔹 Obtener todas las empresas
-        serializer = EmpresaProfileSerializer(empresas, many=True)  # 🔹 Serializar los datos
-        return Response(serializer.data, status=200)
-
-class UpdatePermissionsEmpresa(APIView):
-    """Permite manejar los permisos de una empresa"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, empresa_id):
-        """El MASTER puede actualizar permisos de una empresa"""
-        if request.user.role != "MASTER":
-            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            empresa = EmpresaProfile.objects.get(id=empresa_id)
-            permisos = request.data.get("permisos")  # 🔹 Recibe el valor desde el frontend
-
-            if permisos is None:
-                return Response({"error": "El campo 'permisos' es requerido."}, status=status.HTTP_400_BAD_REQUEST)
-
-            empresa.permisos = permisos
-            empresa.save()
-
-            return Response({"message": "Permisos actualizados correctamente."}, status=status.HTTP_200_OK)
-        except EmpresaProfile.DoesNotExist:
-            return Response({"error": "Empresa no encontrada."}, status=status.HTTP_404_NOT_FOUND)
 
 class RegisterEmployeeView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -150,7 +99,6 @@ class RegisterEmployeeView(APIView):
 
         if not password:
             password = "empleado"
-
 
         if not nombre or not apellido or not dni:
             return Response({"error": "Nombre, Apellido y DNI son obligatorios"}, status=status.HTTP_400_BAD_REQUEST)
@@ -183,6 +131,7 @@ class RegisterEmployeeView(APIView):
         )
 
         return Response(EmpleadoProfileSerializer(empleado).data, status=status.HTTP_201_CREATED)
+
 class BatchRegisterEmployeesView(APIView):
     """Permite a una empresa registrar empleados en lote desde un archivo CSV"""
     authentication_classes = [TokenAuthentication]
@@ -267,4 +216,56 @@ class BatchRegisterEmployeesView(APIView):
             "empleados_registrados": empleados_registrados,
             "empleados_omitidos": empleados_omitidos,
             "errores": errores
-            }, status=201)
+        }, status=201)
+
+class EmpresaManagementView(APIView):
+    """Gestiona empresas: listar, modificar permisos, eliminar"""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """MASTER: Listar todas las empresas"""
+        if request.user.role != "MASTER":
+            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        empresas = EmpresaProfile.objects.all()
+        serializer = EmpresaProfileSerializer(empresas, many=True)
+        return Response(serializer.data, status=200)
+
+    def put(self, request, empresa_id):
+        """MASTER: Actualizar permisos de autogestión"""
+        if request.user.role != "MASTER":
+            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            empresa = EmpresaProfile.objects.get(id=empresa_id)
+            permisos = request.data.get("permisos")
+
+            if permisos is None:
+                return Response({"error": "El campo 'permisos' es requerido."}, status=400)
+
+            empresa.permisos = permisos
+            empresa.save()
+
+            return Response({"message": "Permisos actualizados correctamente."}, status=200)
+        except EmpresaProfile.DoesNotExist:
+            return Response({"error": "Empresa no encontrada."}, status=404)
+
+    def delete(self, request, empresa_id):
+        """MASTER: Eliminar empresa"""
+        if request.user.role != "MASTER":
+            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            empresa = EmpresaProfile.objects.get(id=empresa_id)
+
+            user = empresa.user
+            empresa.delete()
+
+            if user and user.id:
+                user.delete()
+
+            return Response({"message": "Empresa eliminada correctamente."}, status=status.HTTP_204_NO_CONTENT)
+
+        except EmpresaProfile.DoesNotExist:
+            return Response({"error": "Empresa no encontrada."}, status=status.HTTP_404_NOT_FOUND)

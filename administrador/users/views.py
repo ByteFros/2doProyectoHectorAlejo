@@ -118,8 +118,8 @@ class ChangePasswordView(APIView):
     def put(self, request):
         user = request.user
 
-        if user.role != "EMPLEADO":
-            return Response({"error": "Solo los empleados pueden cambiar su contraseña obligatoriamente."},
+        if user.role == "MASTER":
+            return Response({"error": "Los usuarios master no deberian usar este formulario."},
                             status=status.HTTP_403_FORBIDDEN)
 
         old_password = request.data.get("old_password")

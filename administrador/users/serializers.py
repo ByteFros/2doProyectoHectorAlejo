@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje,Notificacion
+from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -92,24 +92,27 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
         return RegisterUserSerializer(user).data
 
+
 class GastoSerializer(serializers.ModelSerializer):
-    """Serializador de Gastos con información detallada de Empresa, Empleado y Viaje"""
+    """Serializador de Gastos con info detallada y soporte de entrada para viaje_id"""
 
     empleado_id = serializers.IntegerField(write_only=True)
     empresa_id = serializers.IntegerField(write_only=True)
+    viaje_id = serializers.IntegerField(write_only=True)
+
     empresa = EmpresaProfileSerializer(read_only=True)
     empleado = EmpleadoProfileSerializer(read_only=True)
-    viaje = serializers.SerializerMethodField()  # ✅ Agregamos los datos del viaje
+    viaje = serializers.SerializerMethodField()
 
     class Meta:
         model = Gasto
         fields = [
             "id", "concepto", "monto", "estado", "fecha_solicitud", "comprobante",
-            "empleado", "empresa", "empleado_id", "empresa_id", "viaje"
+            "empleado", "empresa", "empleado_id", "empresa_id",
+            "viaje", "viaje_id"
         ]
 
     def get_viaje(self, obj):
-        """Retorna los detalles del viaje asociado al gasto"""
         if obj.viaje:
             return {
                 "id": obj.viaje.id,
@@ -119,6 +122,12 @@ class GastoSerializer(serializers.ModelSerializer):
                 "estado": obj.viaje.estado,
             }
         return None
+
+    def create(self, validated_data):
+        # Extraemos y asignamos manualmente el viaje
+        viaje_id = validated_data.pop("viaje_id")
+        validated_data["viaje"] = Viaje.objects.get(id=viaje_id)
+        return super().create(validated_data)
 
 class ViajeSerializer(serializers.ModelSerializer):
     """Serializador para manejar viajes"""
@@ -131,13 +140,14 @@ class ViajeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Viaje
         fields = ["id", "empleado", "empresa", "destino", "fecha_inicio", "fecha_fin", "estado", "fecha_solicitud",
-                  "empleado_id", "empresa_id"]
+                  "empleado_id", "empresa_id","empresa_visitada","motivo","dias_viajados"]
 
     def create(self, validated_data):
         """Crear un viaje asegurando que los IDs sean convertidos en instancias y evitando duplicados"""
 
         empleado_id = validated_data.pop("empleado_id", None)
         empresa_id = validated_data.pop("empresa_id", None)
+        dias_viajados = validated_data.pop("dias_viajados", 1)
 
         # 🔹 Verificar si el empleado y la empresa existen
         try:
@@ -147,6 +157,11 @@ class ViajeSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"empleado_id": "Empleado no encontrado"})
         except EmpresaProfile.DoesNotExist:
             raise serializers.ValidationError({"empresa_id": "Empresa no encontrada"})
+
+        # 🔹 Validar el motivo del viaje
+        motivo = validated_data.get("motivo", "")
+        if len(motivo) > 500:
+            raise serializers.ValidationError({"motivo": "El motivo no puede superar los 500 caracteres"})
 
         # 🔹 Verificar si YA existe un viaje en estado "PENDIENTE" para la empresa en las mismas fechas y destino
         viaje_existente = Viaje.objects.filter(
@@ -163,13 +178,24 @@ class ViajeSerializer(serializers.ModelSerializer):
             )
 
         # 🔹 Si no hay duplicados, crear el viaje
-        viaje = Viaje.objects.create(empleado=empleado, empresa=empresa, **validated_data)
+        viaje = Viaje.objects.create(empleado=empleado,
+                                     empresa=empresa,
+                                        dias_viajados=dias_viajados,
+                                     **validated_data)
 
         return viaje
-
 
 
 class NotificacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notificacion
         fields = ["id", "tipo", "mensaje", "fecha_creacion", "leida"]
+
+
+# serializers.py
+
+class NotaViajeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notas
+        fields = ['id', 'viaje', 'empleado', 'contenido', 'fecha_creacion']
+        read_only_fields = ['id', 'fecha_creacion', 'empleado']
