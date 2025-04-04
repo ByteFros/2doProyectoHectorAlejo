@@ -126,6 +126,8 @@ class Gasto(models.Model):
         ("PENDIENTE", "Pendiente"),
         ("APROBADO", "Aprobado"),
         ("RECHAZADO", "Rechazado"),
+        ("JUSTIFICAR", "Justificante solicitado")
+
     ]
 
     empleado = models.ForeignKey(EmpleadoProfile, on_delete=models.CASCADE)
@@ -167,3 +169,16 @@ class Notas(models.Model):
 
     def __str__(self):
         return f"Nota para viaje {self.viaje.id} - {self.fecha_creacion.strftime('%Y-%m-%d')}"
+
+
+class MensajeJustificante(models.Model):
+    gasto = models.ForeignKey("Gasto", on_delete=models.CASCADE, related_name="mensajes_justificante")
+    autor = models.ForeignKey("CustomUser", on_delete=models.CASCADE)
+    motivo = models.TextField(max_length=500)
+    respuesta = models.TextField(max_length=500, blank=True, null=True)
+    archivo_justificante = models.FileField(upload_to="respuestas_justificantes/", null=True, blank=True)
+    estado = models.CharField(max_length=20, choices=[("pendiente", "Pendiente"), ("aprobado", "Aprobado"), ("rechazado", "Rechazado")], default="pendiente")
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Mensaje para Gasto {self.gasto.id} - {self.fecha_creacion.strftime('%Y-%m-%d')}"

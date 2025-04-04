@@ -204,3 +204,22 @@ class EmployeeListView(APIView):
 
         serializer = EmpleadoProfileSerializer(empleados, many=True)
         return Response(serializer.data, status=200)
+
+
+class EmpleadosPorEmpresaView(APIView):
+    """MASTER: Lista empleados de una empresa específica"""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, empresa_id):
+        if request.user.role != "MASTER":
+            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            empresa = EmpresaProfile.objects.get(id=empresa_id)
+        except EmpresaProfile.DoesNotExist:
+            return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+        empleados = EmpleadoProfile.objects.filter(empresa=empresa)
+        serializer = EmpleadoProfileSerializer(empleados, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

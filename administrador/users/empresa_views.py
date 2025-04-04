@@ -62,14 +62,14 @@ class EliminarEmpleadoView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, dni):
+    def delete(self, request, empleado_id):
         """La EMPRESA puede eliminar a un empleado de su empresa"""
         if request.user.role != "EMPRESA":
             return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            empleado = EmpleadoProfile.objects.get(dni=dni, empresa__user=request.user)
-            empleado.user.delete()
+            empleado = EmpleadoProfile.objects.get(id=empleado_id, empresa__user=request.user)
+            empleado.user.delete()  # Elimina también el usuario relacionado
             empleado.delete()
             return Response({"message": "Empleado eliminado correctamente."}, status=status.HTTP_204_NO_CONTENT)
         except EmpleadoProfile.DoesNotExist:

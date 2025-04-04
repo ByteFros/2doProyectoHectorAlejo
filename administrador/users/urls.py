@@ -5,12 +5,14 @@ from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
     RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView
 from .gastos_views import CrearGastoView, AprobarRechazarGastoView, GastoListView, GastoUpdateDeleteView, \
     GastoComprobanteDownloadView
+from .messages_views import SolicitarJustificanteView, ListarMensajesView, ResponderMensajeView, \
+    CambiarEstadoJustificacionView, DescargarArchivoMensajeView
 from .notas_views import NotaViajeListCreateView, NotaViajeDeleteView
 from .notificaciones_views import ListaNotificacionesView, CrearNotificacionView
 from .viajes_views import CrearViajeView, AprobarRechazarViajeView, FinalizarViajeView, IniciarViajeView, \
     ListarViajesFinalizadosView, ListarTodosLosViajesView, CancelarViajeView, ViajeEnCursoView
 from .views import UserDetailView, EmployeeListView, PasswordResetRequestView, \
-    PasswordResetConfirmView, ChangePasswordView
+    PasswordResetConfirmView, ChangePasswordView, EmpleadosPorEmpresaView
 
 urlpatterns = [
     # Autenticación
@@ -24,9 +26,10 @@ urlpatterns = [
     # Usuarios y empresas
     path('profile/', UserDetailView.as_view(), name='profile'),
     path('empleados/', EmployeeListView.as_view(), name='empleados'),
-    path('empleados/<str:dni>/', EliminarEmpleadoView.as_view(), name='eliminar_empleado'),
-    path('empresas2/', EmpresaManagementView.as_view(), name='gestionar_empresas'),  # GET
-    path('empresas2/<int:empresa_id>/', EmpresaManagementView.as_view(), name='gestionar_una_empresa'),  # PUT & DELETE
+    path('empleados/<int:empleado_id>/', EliminarEmpleadoView.as_view(), name='eliminar_empleado'),
+    path('empresas/', EmpresaManagementView.as_view(), name='gestionar_empresas'),  # GET
+    path('empresas/<int:empresa_id>/', EmpresaManagementView.as_view(), name='gestionar_una_empresa'),  # PUT & DELETE
+    path('empresas/<int:empresa_id>/empleados/', EmpleadosPorEmpresaView.as_view(), name='empleados_por_empresa'),
 
     # Gastos
     path('gastos/', GastoListView.as_view(), name='lista_gastos'),
@@ -34,6 +37,8 @@ urlpatterns = [
     path('gastos/<int:gasto_id>/', AprobarRechazarGastoView.as_view(), name='aprobar_rechazar_gasto'),
     path("gastos/edit/<int:gasto_id>/", GastoUpdateDeleteView.as_view(), name="gasto_crud"),
     path("gastos/<int:gasto_id>/file/", GastoComprobanteDownloadView.as_view(), name="gasto_archivo"),
+    path("gastos/<int:gasto_id>/request-proof/", SolicitarJustificanteView.as_view(), name="solicitar_justificante"),
+
 
     # Viajes
     path("viajes/new/", CrearViajeView.as_view(), name="nuevo_viaje"),
@@ -56,7 +61,14 @@ urlpatterns = [
 
     #notas
     path("notas/<int:viaje_id>/", NotaViajeListCreateView.as_view(), name="notas_viaje"),
-    path("notas/delete/<int:nota_id>/", NotaViajeDeleteView.as_view(), name="eliminar_nota")
+    path("notas/delete/<int:nota_id>/", NotaViajeDeleteView.as_view(), name="eliminar_nota"),
+
+    #Mensajes
+    path("mensajes/", ListarMensajesView.as_view(), name="listar_mensajes"),
+    path("mensajes/<int:mensaje_id>/responder/", ResponderMensajeView.as_view(), name="responder_mensaje"),
+    path("mensajes/<int:mensaje_id>/cambiar-estado/", CambiarEstadoJustificacionView.as_view(), name="cambiar_estado_justificante"),
+    path("mensajes/<int:mensaje_id>/file/", DescargarArchivoMensajeView.as_view()),
+
 
 
 ]

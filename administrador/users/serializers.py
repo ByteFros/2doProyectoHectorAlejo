@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas
+from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -129,6 +129,7 @@ class GastoSerializer(serializers.ModelSerializer):
         validated_data["viaje"] = Viaje.objects.get(id=viaje_id)
         return super().create(validated_data)
 
+
 class ViajeSerializer(serializers.ModelSerializer):
     """Serializador para manejar viajes"""
 
@@ -140,7 +141,7 @@ class ViajeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Viaje
         fields = ["id", "empleado", "empresa", "destino", "fecha_inicio", "fecha_fin", "estado", "fecha_solicitud",
-                  "empleado_id", "empresa_id","empresa_visitada","motivo","dias_viajados"]
+                  "empleado_id", "empresa_id", "empresa_visitada", "motivo", "dias_viajados"]
 
     def create(self, validated_data):
         """Crear un viaje asegurando que los IDs sean convertidos en instancias y evitando duplicados"""
@@ -180,7 +181,7 @@ class ViajeSerializer(serializers.ModelSerializer):
         # 🔹 Si no hay duplicados, crear el viaje
         viaje = Viaje.objects.create(empleado=empleado,
                                      empresa=empresa,
-                                        dias_viajados=dias_viajados,
+                                     dias_viajados=dias_viajados,
                                      **validated_data)
 
         return viaje
@@ -199,3 +200,26 @@ class NotaViajeSerializer(serializers.ModelSerializer):
         model = Notas
         fields = ['id', 'viaje', 'empleado', 'contenido', 'fecha_creacion']
         read_only_fields = ['id', 'fecha_creacion', 'empleado']
+
+
+class MensajeJustificanteSerializer(serializers.ModelSerializer):
+    autor = serializers.StringRelatedField(read_only=True)
+    archivo_justificante_url = serializers.SerializerMethodField()
+    gasto_id = serializers.IntegerField(source='gasto.id', read_only=True)
+    remitente = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MensajeJustificante
+        fields = ["id", "gasto", "autor", "motivo", "respuesta", "estado", "archivo_justificante_url", "fecha_creacion",
+                  "gasto_id", "remitente"]
+        read_only_fields = ["id", "fecha_creacion", "autor", "archivo_justificante_url", "gasto_id"]
+
+    def get_remitente(self, obj):
+        if obj.respuesta and obj.gasto.empleado:
+            return obj.gasto.empleado.user.username
+        return None
+
+    def get_archivo_justificante_url(self, obj):
+        if obj.archivo_justificante:
+            return obj.archivo_justificante.url
+        return None

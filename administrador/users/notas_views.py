@@ -56,3 +56,5 @@ class NotaViajeDeleteView(APIView):
             return Response({"message": "Nota eliminada"}, status=204)
         except Notas.DoesNotExist:
             return Response({"error": "Nota no encontrada o no tienes permisos"}, status=404)
+
+
