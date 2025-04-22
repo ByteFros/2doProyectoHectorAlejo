@@ -101,6 +101,7 @@ class Viaje(models.Model):
     ESTADO_CHOICES = [
         ("PENDIENTE", "Pendiente"),
         ("EN_CURSO", "En curso"),
+        ("EN_REVISION", "En revision"),
         ("FINALIZADO", "Finalizado"),
         ("CANCELADO", "Cancelado"),
     ]
@@ -119,6 +120,16 @@ class Viaje(models.Model):
     def __str__(self):
         return f"{self.empleado.nombre} viaja a {self.destino} ({self.estado})"
 
+class DiaViaje(models.Model):
+    """Modelo para manejar los días de viaje"""
+
+    viaje = models.ForeignKey(Viaje, on_delete=models.CASCADE, related_name="dias")
+    fecha = models.DateField()
+    exento = models.BooleanField(default=False)
+    revisado = models.BooleanField(default=False)
+
+
+
 class Gasto(models.Model):
     """Modelo de gastos asociados a viajes"""
 
@@ -132,13 +143,14 @@ class Gasto(models.Model):
 
     empleado = models.ForeignKey(EmpleadoProfile, on_delete=models.CASCADE)
     empresa = models.ForeignKey(EmpresaProfile, on_delete=models.CASCADE)
-    viaje = models.ForeignKey(Viaje, on_delete=models.CASCADE, null =True, blank= True)  # 🔹 Ahora es obligatorio asociarlo a un viaje
+    viaje = models.ForeignKey(Viaje, on_delete=models.CASCADE, null=True, blank=True)
+    dia = models.ForeignKey(DiaViaje, on_delete=models.CASCADE,null=True,blank=True, related_name="gastos")
     concepto = models.TextField()
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     estado = models.CharField(max_length=10, choices=ESTADO_CHOICES, default="PENDIENTE")
     comprobante = models.FileField(upload_to="comprobantes/", null=True, blank=True)
+    fecha_gasto = models.DateField(null=True, blank=True , help_text="Fecha del gasto")
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
-
     def __str__(self):
         return f"{self.concepto} - {self.estado}"
 

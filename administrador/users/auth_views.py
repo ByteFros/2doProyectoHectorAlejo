@@ -7,6 +7,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from .serializers import CustomUserSerializer, RegisterUserSerializer
 
+
 class LoginView(APIView):
     permission_classes = [AllowAny]
 

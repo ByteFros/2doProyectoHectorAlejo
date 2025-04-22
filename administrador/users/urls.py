@@ -39,7 +39,6 @@ urlpatterns = [
     path("gastos/<int:gasto_id>/file/", GastoComprobanteDownloadView.as_view(), name="gasto_archivo"),
     path("gastos/<int:gasto_id>/request-proof/", SolicitarJustificanteView.as_view(), name="solicitar_justificante"),
 
-
     # Viajes
     path("viajes/new/", CrearViajeView.as_view(), name="nuevo_viaje"),
     path("viajes/<int:viaje_id>/", AprobarRechazarViajeView.as_view(), name="aprobar_rechazar_viaje"),
@@ -51,7 +50,7 @@ urlpatterns = [
     path("viajes/<int:viaje_id>/cancelar/", CancelarViajeView.as_view(), name="cancel"),
 
     # Contraseña
-    path("password-reset/", PasswordResetRequestView.as_view(), name="password_reset"),
+    path("password-reset-request/", PasswordResetRequestView.as_view(), name="password_reset"),
     path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 
@@ -68,7 +67,4 @@ urlpatterns = [
     path("mensajes/<int:mensaje_id>/responder/", ResponderMensajeView.as_view(), name="responder_mensaje"),
     path("mensajes/<int:mensaje_id>/cambiar-estado/", CambiarEstadoJustificacionView.as_view(), name="cambiar_estado_justificante"),
     path("mensajes/<int:mensaje_id>/file/", DescargarArchivoMensajeView.as_view()),
-
-
-
 ]

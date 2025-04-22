@@ -30,7 +30,7 @@ SECRET_KEY = 'django-insecure-e$(-3@+$oz#j@j2at*ce32q=iav#lm%27_$z-uj5y@8rtz@*vp
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -97,11 +97,11 @@ WSGI_APPLICATION = 'administrador.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'administrador_db',
-        'USER': 'postgres',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'NAME': os.getenv("DB_NAME", "administrador_db"),
+        'USER': os.getenv("DB_USER", "postgres"),
+        'PASSWORD': os.getenv("DB_PASSWORD", "1234"),
+        'HOST': os.getenv("DB_HOST", "localhost"),
+        'PORT': os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -156,7 +156,7 @@ AUTH_USER_MODEL = 'users.CustomUser'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "http://localhost:5174",
+    "http://localhost:8000",
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # ✅ Permitir envío de cookies

@@ -1,14 +1,15 @@
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
+from django.shortcuts import get_object_or_404
 
-from .models import EmpleadoProfile, Viaje, EmpresaProfile, Notificacion
+from .models import EmpleadoProfile, Viaje, EmpresaProfile, Notificacion, DiaViaje
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework import status
-from datetime import datetime, date
-from .serializers import ViajeSerializer
+from datetime import datetime, date, timedelta
+from .serializers import ViajeSerializer, DiaViajeSerializer
 
 
 class CrearViajeView(APIView):
@@ -175,28 +176,74 @@ class IniciarViajeView(APIView):
 
 
 class FinalizarViajeView(APIView):
-    """Permite a un empleado finalizar un viaje en curso"""
-    authentication_classes = [TokenAuthentication]
+    """Permite al empleado finalizar su viaje y pasar a estado de revisión"""
     permission_classes = [IsAuthenticated]
 
     def put(self, request, viaje_id):
-        if request.user.role != "EMPLEADO":
-            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+        # Solo empleados pueden finalizar
+        if request.user.role != 'EMPLEADO':
+            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
 
-        try:
-            viaje = Viaje.objects.get(id=viaje_id, empleado__user=request.user)
+        viaje = get_object_or_404(Viaje, id=viaje_id, empleado__user=request.user)
 
-            if viaje.estado != "EN_CURSO":
-                return Response({"error": "Solo puedes finalizar un viaje en curso"},
-                                status=status.HTTP_400_BAD_REQUEST)
+        if viaje.estado != 'EN_CURSO':
+            return Response({'error': 'Solo puedes finalizar un viaje en curso.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-            viaje.estado = "FINALIZADO"
-            viaje.save()
-            return Response({"message": "Viaje finalizado correctamente."}, status=status.HTTP_200_OK)
+        # Cambiar a revisión
+        viaje.estado = 'EN_REVISION'
+        viaje.save()
 
-        except Viaje.DoesNotExist:
-            return Response({"error": "Viaje no encontrado o no autorizado"}, status=status.HTTP_404_NOT_FOUND)
+        # Crear objetos DiaViaje para cada jornada si no existen
+        start = viaje.fecha_inicio
+        end = viaje.fecha_fin
+        delta = (end - start).days
+        for i in range(delta + 1):
+            fecha = start + timedelta(days=i)
+            DiaViaje.objects.get_or_create(viaje=viaje, fecha=fecha)
 
+        return Response({'message': 'Viaje en revisión. Un supervisor procederá a validar los días.'},
+                        status=status.HTTP_200_OK)
+
+    class RevisionViajeView(APIView):
+        """Permite a usuarios superiores revisar y exentar/aprobar días del viaje"""
+        permission_classes = [IsAuthenticated]
+
+        def get(self, request, viaje_id):
+            # Solo EMPRESA o MASTER pueden revisar
+            if request.user.role not in ('EMPRESA', 'MASTER'):
+                return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+
+            viaje = get_object_or_404(Viaje, id=viaje_id, estado='EN_REVISION')
+            dias = viaje.dias.prefetch_related('gastos')
+            serializer = DiaViajeSerializer(dias, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        def put(self, request, viaje_id):
+            if request.user.role not in ('EMPRESA', 'MASTER'):
+                return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+
+            viaje = get_object_or_404(Viaje, id=viaje_id, estado='EN_REVISION')
+            datos = request.data.get('dias', [])
+
+            for dia_data in datos:
+                dia = get_object_or_404(DiaViaje, id=dia_data.get('id'), viaje=viaje)
+                exento = dia_data.get('exento', False)
+
+                dia.exento = exento
+                dia.revisado = True
+                dia.save()
+
+                # Actualizar estado de gastos asociados
+                estado_nuevo = 'RECHAZADO' if exento else 'APROBADO'
+                dia.gastos.update(estado=estado_nuevo)
+
+            # Si todos los días ya revisados, finalizar el viaje
+            if viaje.dias.filter(revisado=False).count() == 0:
+                viaje.estado = 'FINALIZADO'
+                viaje.save()
+
+            return Response({'message': 'Días revisados correctamente.'}, status=status.HTTP_200_OK)
 
 class CancelarViajeView(APIView):
     """Permite a un empleado cancelar un viaje antes de que comience"""
@@ -287,15 +334,32 @@ class ListarViajesFinalizadosView(APIView):
         return Response(serializer.data, status=200)
 
 class ListarTodosLosViajesView(APIView):
-    """Lista todos los viajes sin importar el estado"""
+    """Lista todos los viajes según el rol del usuario"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Devuelve todos los viajes en la base de datos"""
-        if request.user.role not in ["EMPRESA", "MASTER", "EMPLEADO"]:
-            return Response({"error": "No autorizado"}, status=403)
+        user = request.user
 
-        viajes = Viaje.objects.all()
+        if user.role == "MASTER":
+            viajes = Viaje.objects.all()
+
+        elif user.role == "EMPRESA":
+            try:
+                empresa = EmpresaProfile.objects.get(user=user)
+                viajes = Viaje.objects.filter(empleado__empresa=empresa)
+            except EmpresaProfile.DoesNotExist:
+                return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
+
+        elif user.role == "EMPLEADO":
+            try:
+                empleado = EmpleadoProfile.objects.get(user=user)
+                viajes = Viaje.objects.filter(empleado=empleado)
+            except EmpleadoProfile.DoesNotExist:
+                return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
+
+        else:
+            return Response({"error": "Rol de usuario no reconocido"}, status=403)
+
         serializer = ViajeSerializer(viajes, many=True)
         return Response(serializer.data, status=200)

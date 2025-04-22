@@ -156,5 +156,6 @@ class DescargarArchivoMensajeView(APIView):
         content_type = mime_type or 'application/octet-stream'
 
         response = FileResponse(archivo.open(), content_type=content_type)
-        response['Content-Disposition'] = f'inline; filename=\"{archivo.name.split('/')[-1]}\"'
+        response['Content-Disposition'] = f"inline; filename=\"{archivo.name.split('/')[-1]}\""
+
         return response

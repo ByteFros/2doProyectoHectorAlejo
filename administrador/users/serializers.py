@@ -1,5 +1,8 @@
+from datetime import date, timezone
+
 from rest_framework import serializers
-from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante
+from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
+    DiaViaje
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -99,6 +102,7 @@ class GastoSerializer(serializers.ModelSerializer):
     empleado_id = serializers.IntegerField(write_only=True)
     empresa_id = serializers.IntegerField(write_only=True)
     viaje_id = serializers.IntegerField(write_only=True)
+    fecha_gasto = serializers.DateField(allow_null= True, required = False, help_text="Fecha en que ocurrio el gasto")
 
     empresa = EmpresaProfileSerializer(read_only=True)
     empleado = EmpleadoProfileSerializer(read_only=True)
@@ -107,10 +111,11 @@ class GastoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gasto
         fields = [
-            "id", "concepto", "monto", "estado", "fecha_solicitud", "comprobante",
+            "id", "concepto", "monto","fecha_gasto", "estado", "fecha_solicitud", "comprobante",
             "empleado", "empresa", "empleado_id", "empresa_id",
             "viaje", "viaje_id"
         ]
+        read_only_fields = ["id", "estado", "fecha_solicitud","viaje"]
 
     def get_viaje(self, obj):
         if obj.viaje:
@@ -124,66 +129,100 @@ class GastoSerializer(serializers.ModelSerializer):
         return None
 
     def create(self, validated_data):
-        # Extraemos y asignamos manualmente el viaje
-        viaje_id = validated_data.pop("viaje_id")
-        validated_data["viaje"] = Viaje.objects.get(id=viaje_id)
-        return super().create(validated_data)
+        # 1) Extraemos el viaje
+        viaje = Viaje.objects.get(id=validated_data.pop("viaje_id"))
+
+        # 2) Sacamos fecha_gasto si vino, o tomamos la fecha local de hoy
+        fecha = validated_data.pop("fecha_gasto", None)
+        if fecha is None:
+            fecha = timezone.localdate()
+
+        # 3) Obtenemos o creamos el DíaViaje correspondiente
+        dia, _ = DiaViaje.objects.get_or_create(viaje=viaje, fecha=fecha)
+
+        # 4) Creamos el gasto asociando viaje, día y resto de campos
+        gasto = Gasto.objects.create(
+            viaje=viaje,
+            dia=dia,
+            **validated_data
+        )
+        return gasto
+class DiaViajeSerializer(serializers.ModelSerializer):
+    """Serializador para representar cada día de viaje junto con sus gastos"""
+    gastos = GastoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = DiaViaje
+        fields = [
+            'id',
+            'fecha',
+            'exento',
+            'revisado',
+            'gastos',
+        ]
+        read_only_fields = ['id', 'fecha', 'gastos']
+
+    def update(self, instance, validated_data):
+        # Solo actualizar los flags exento y revisado
+        instance.exento = validated_data.get('exento', instance.exento)
+        instance.revisado = validated_data.get('revisado', instance.revisado)
+        instance.save()
+        return instance
 
 
 class ViajeSerializer(serializers.ModelSerializer):
-    """Serializador para manejar viajes"""
+    """Serializador para manejar viajes y cálculo automático de días"""
 
     empleado_id = serializers.IntegerField(write_only=True)
     empresa_id = serializers.IntegerField(write_only=True)
     empresa = EmpresaProfileSerializer(read_only=True)
     empleado = EmpleadoProfileSerializer(read_only=True)
+    dias_viajados = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Viaje
-        fields = ["id", "empleado", "empresa", "destino", "fecha_inicio", "fecha_fin", "estado", "fecha_solicitud",
-                  "empleado_id", "empresa_id", "empresa_visitada", "motivo", "dias_viajados"]
+        fields = [
+            'id', 'empleado', 'empresa', 'destino',
+            'fecha_inicio', 'fecha_fin', 'estado', 'fecha_solicitud',
+            'empleado_id', 'empresa_id', 'empresa_visitada', 'motivo',
+            'dias_viajados'
+        ]
 
     def create(self, validated_data):
-        """Crear un viaje asegurando que los IDs sean convertidos en instancias y evitando duplicados"""
+        empleado_id = validated_data.pop('empleado_id')
+        empresa_id = validated_data.pop('empresa_id')
 
-        empleado_id = validated_data.pop("empleado_id", None)
-        empresa_id = validated_data.pop("empresa_id", None)
-        dias_viajados = validated_data.pop("dias_viajados", 1)
+        empleado = EmpleadoProfile.objects.get(id=empleado_id)
+        empresa = EmpresaProfile.objects.get(id=empresa_id)
 
-        # 🔹 Verificar si el empleado y la empresa existen
-        try:
-            empleado = EmpleadoProfile.objects.get(id=empleado_id)
-            empresa = EmpresaProfile.objects.get(id=empresa_id)
-        except EmpleadoProfile.DoesNotExist:
-            raise serializers.ValidationError({"empleado_id": "Empleado no encontrado"})
-        except EmpresaProfile.DoesNotExist:
-            raise serializers.ValidationError({"empresa_id": "Empresa no encontrada"})
+        # Calcular días de viaje inclusivos
+        fecha_inicio = validated_data.get('fecha_inicio')
+        fecha_fin = validated_data.get('fecha_fin')
+        dias = (fecha_fin - fecha_inicio).days + 1
 
-        # 🔹 Validar el motivo del viaje
-        motivo = validated_data.get("motivo", "")
-        if len(motivo) > 500:
-            raise serializers.ValidationError({"motivo": "El motivo no puede superar los 500 caracteres"})
+        # Verificación de duplicados y validaciones de motivo
+        motivo = validated_data.get('motivo', '')
+        if motivo and len(motivo) > 500:
+            raise serializers.ValidationError({'motivo': 'El motivo no puede superar los 500 caracteres'})
 
-        # 🔹 Verificar si YA existe un viaje en estado "PENDIENTE" para la empresa en las mismas fechas y destino
-        viaje_existente = Viaje.objects.filter(
+        existe = Viaje.objects.filter(
             empresa=empresa,
-            destino=validated_data.get("destino"),
-            fecha_inicio=validated_data.get("fecha_inicio"),
-            fecha_fin=validated_data.get("fecha_fin"),
-            estado="PENDIENTE"
+            destino=validated_data.get('destino'),
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            estado='PENDIENTE'
         ).exists()
-
-        if viaje_existente:
+        if existe:
             raise serializers.ValidationError(
-                {"error": "Ya existe un viaje pendiente a este destino en estas fechas para la empresa."}
+                {'error': 'Ya existe un viaje pendiente a este destino en estas fechas para la empresa.'}
             )
 
-        # 🔹 Si no hay duplicados, crear el viaje
-        viaje = Viaje.objects.create(empleado=empleado,
-                                     empresa=empresa,
-                                     dias_viajados=dias_viajados,
-                                     **validated_data)
-
+        viaje = Viaje.objects.create(
+            empleado=empleado,
+            empresa=empresa,
+            dias_viajados=dias,
+            **validated_data
+        )
         return viaje
 
 
@@ -223,3 +262,5 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
         if obj.archivo_justificante:
             return obj.archivo_justificante.url
         return None
+
+
