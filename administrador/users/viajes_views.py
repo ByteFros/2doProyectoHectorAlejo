@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from rest_framework import status
 from datetime import datetime, date, timedelta
-from .serializers import ViajeSerializer, DiaViajeSerializer
+from .serializers import ViajeSerializer, DiaViajeSerializer, PendingTripSerializer
 
 
 class CrearViajeView(APIView):
@@ -333,6 +333,38 @@ class ListarViajesFinalizadosView(APIView):
         serializer = ViajeSerializer(viajes, many=True)
         return Response(serializer.data, status=200)
 
+class PendingTripsByEmployeeView(APIView):
+    """
+    MASTER puede ver cualquier empleado;
+    EMPRESA sólo los de su empresa;
+    EMPLEADO ve sólo sus propios viajes.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, empleado_id):
+        empleado = get_object_or_404(EmpleadoProfile, id=empleado_id)
+
+        # --- Permisos ---
+        if request.user.role == 'EMPRESA':
+            # Una empresa sólo ve a sus propios empleados
+            mi_empresa = getattr(request.user, 'empresa_profile', None)
+            if not mi_empresa or empleado.empresa_id != mi_empresa.id:
+                return Response({'error': 'No autorizado'}, status=403)
+
+        elif request.user.role == 'EMPLEADO':
+            # Un empleado sólo ve SUS propios viajes
+            if empleado.user != request.user:
+                return Response({'error': 'No autorizado'}, status=403)
+
+        # MASTER pasa sin restricciones
+
+        # --- Lectura de los viajes en revisión ---
+        viajes = Viaje.objects.filter(empleado=empleado, estado='EN_REVISION')
+        serializer = PendingTripSerializer(viajes, many=True)
+        return Response(serializer.data, status=200)
+
+
 class ListarTodosLosViajesView(APIView):
     """Lista todos los viajes según el rol del usuario"""
     authentication_classes = [TokenAuthentication]
@@ -363,3 +395,39 @@ class ListarTodosLosViajesView(APIView):
 
         serializer = ViajeSerializer(viajes, many=True)
         return Response(serializer.data, status=200)
+
+
+# users/views.py
+
+class PendingTripsDetailView(APIView):
+    """Devuelve count + lista de viajes 'EN_REVISION', opcionalmente filtrado por empleado."""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        empleado_id = request.query_params.get('empleado')
+
+        # Si piden por empleado y tengo permiso, lo filtro
+        if empleado_id:
+            # Sólo EMPRESA/MASTER pueden filtrar otros; EMPLEADO sólo el suyo
+            if user.role == "EMPLEADO" and int(empleado_id) != user.empleado_profile.id:
+                return Response({"error": "No autorizado"}, status=403)
+            viajes_qs = Viaje.objects.filter(empleado_id=empleado_id, estado="EN_REVISION")
+
+        else:
+            # Sin filtro, cae en la lógica global
+            if user.role == "MASTER":
+                viajes_qs = Viaje.objects.filter(estado="EN_REVISION")
+            elif user.role == "EMPRESA":
+                empresa = get_object_or_404(EmpresaProfile, user=user)
+                viajes_qs = Viaje.objects.filter(empleado__empresa=empresa, estado="EN_REVISION")
+            else:  # EMPLEADO
+                empleado = get_object_or_404(EmpleadoProfile, user=user)
+                viajes_qs = Viaje.objects.filter(empleado=empleado, estado="EN_REVISION")
+
+        serializer = PendingTripSerializer(viajes_qs, many=True)
+        return Response({
+            "count": viajes_qs.count(),
+            "trips": serializer.data
+        }, status=200)

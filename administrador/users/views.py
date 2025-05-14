@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
@@ -206,20 +207,27 @@ class EmployeeListView(APIView):
         return Response(serializer.data, status=200)
 
 
+
 class EmpleadosPorEmpresaView(APIView):
-    """MASTER: Lista empleados de una empresa específica"""
+    """MASTER puede ver empleados de cualquier empresa; EMPRESA sólo los suyos"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empresa_id):
-        if request.user.role != "MASTER":
+        # Recuperamos la empresa o 404
+        empresa = get_object_or_404(EmpresaProfile, id=empresa_id)
+
+        # Si soy EMPRESA, sólo puedo consultar mi propia empresa
+        if request.user.role == "EMPRESA":
+            mi_empresa = getattr(request.user, "empresa_profile", None)
+            if not mi_empresa or mi_empresa.id != empresa.id:
+                return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        # Si soy EMPLEADO, no tengo permiso
+        if request.user.role == "EMPLEADO":
             return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
 
-        try:
-            empresa = EmpresaProfile.objects.get(id=empresa_id)
-        except EmpresaProfile.DoesNotExist:
-            return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
-
+        # Llegados aquí, MASTER o EMPRESA dueña
         empleados = EmpleadoProfile.objects.filter(empresa=empresa)
         serializer = EmpleadoProfileSerializer(empleados, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

@@ -1,6 +1,7 @@
 import csv
 import io
 
+from django.shortcuts import get_object_or_404
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -9,7 +10,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer
+from .serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer, EmpresaPendingSerializer
 from django.db import IntegrityError, transaction
 
 
@@ -218,6 +219,7 @@ class BatchRegisterEmployeesView(APIView):
             "errores": errores
         }, status=201)
 
+
 class EmpresaManagementView(APIView):
     """Gestiona empresas: listar, modificar permisos, eliminar"""
     authentication_classes = [TokenAuthentication]
@@ -269,3 +271,71 @@ class EmpresaManagementView(APIView):
 
         except EmpresaProfile.DoesNotExist:
             return Response({"error": "Empresa no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class PendingCompaniesView(APIView):
+    """
+    Devuelve las empresas que tienen empleados con viajes en estado EN_REVISION.
+    - MASTER ve todas
+    - EMPRESA con permisos ve solo su propia empresa (si aplica)
+    - EMPLEADO NO autorizado
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        # Rol EMPLEADO no puede ver la lista global
+        if user.role == 'EMPLEADO':
+            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Base queryset: empresas con al menos un viaje en revisión
+        qs = EmpresaProfile.objects.filter(
+            empleados__viaje__estado='EN_REVISION'
+        ).distinct()
+
+        # Si es EMPRESA, limitar a la suya (solo si tiene permisos de autogestión)
+        if user.role == 'EMPRESA':
+            try:
+                mi_empresa = user.empresa_profile
+            except EmpresaProfile.DoesNotExist:
+                return Response({'error': 'No tienes perfil de empresa'}, status=status.HTTP_403_FORBIDDEN)
+            if not mi_empresa.permisos:
+                return Response({'error': 'No tienes permisos para gestionar revisiones'}, status=status.HTTP_403_FORBIDDEN)
+            qs = qs.filter(id=mi_empresa.id)
+
+        # MASTER ve QS completo
+        data = EmpresaPendingSerializer(qs, many=True).data
+        return Response(data, status=status.HTTP_200_OK)
+
+class PendingEmployeesByCompanyView(APIView):
+    """
+    Devuelve solo los empleados de la empresa {empresa_id} que tienen
+    al menos un viaje en estado EN_REVISION.
+    MASTER ve todos, EMPRESA solo los suyos, EMPLEADO no autorizado.
+    """
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, empresa_id):
+        empresa = get_object_or_404(EmpresaProfile, id=empresa_id)
+
+        # EMPRESA solo sus propios empleados
+        if request.user.role == 'EMPRESA':
+            mi_empresa = getattr(request.user, 'empresa_profile', None)
+            if not mi_empresa or mi_empresa.id != empresa.id:
+                return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+        # EMPLEADO no puede
+        elif request.user.role == 'EMPLEADO':
+            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+        # MASTER pasa
+
+        # Filtramos empleados que tengan viajes EN_REVISION
+        empleados = EmpleadoProfile.objects.filter(
+            empresa=empresa,
+            viaje__estado='EN_REVISION'
+        ).distinct()
+
+        serializer = EmpleadoProfileSerializer(empleados, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

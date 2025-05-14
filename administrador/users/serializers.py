@@ -1,8 +1,7 @@
-from datetime import date, timezone
-
+from django.utils import timezone
 from rest_framework import serializers
 from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
-    DiaViaje
+    DiaViaje, Conversacion, Mensaje
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -23,10 +22,11 @@ class EmpresaProfileSerializer(serializers.ModelSerializer):
 class EmpleadoProfileSerializer(serializers.ModelSerializer):
     empresa = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
     email = serializers.StringRelatedField(source="user.email", read_only=True)
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id']
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
@@ -102,7 +102,7 @@ class GastoSerializer(serializers.ModelSerializer):
     empleado_id = serializers.IntegerField(write_only=True)
     empresa_id = serializers.IntegerField(write_only=True)
     viaje_id = serializers.IntegerField(write_only=True)
-    fecha_gasto = serializers.DateField(allow_null= True, required = False, help_text="Fecha en que ocurrio el gasto")
+    fecha_gasto = serializers.DateField(allow_null=True, required=False, help_text="Fecha en que ocurrio el gasto")
 
     empresa = EmpresaProfileSerializer(read_only=True)
     empleado = EmpleadoProfileSerializer(read_only=True)
@@ -111,11 +111,11 @@ class GastoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gasto
         fields = [
-            "id", "concepto", "monto","fecha_gasto", "estado", "fecha_solicitud", "comprobante",
+            "id", "concepto", "monto", "fecha_gasto", "estado", "fecha_solicitud", "comprobante",
             "empleado", "empresa", "empleado_id", "empresa_id",
             "viaje", "viaje_id"
         ]
-        read_only_fields = ["id", "estado", "fecha_solicitud","viaje"]
+        read_only_fields = ["id", "estado", "fecha_solicitud", "viaje"]
 
     def get_viaje(self, obj):
         if obj.viaje:
@@ -137,16 +137,25 @@ class GastoSerializer(serializers.ModelSerializer):
         if fecha is None:
             fecha = timezone.localdate()
 
-        # 3) Obtenemos o creamos el DíaViaje correspondiente
+        # 3) Obtenemos/creamos el DiaViaje
         dia, _ = DiaViaje.objects.get_or_create(viaje=viaje, fecha=fecha)
 
-        # 4) Creamos el gasto asociando viaje, día y resto de campos
+        # 4) Sacamos empleado_id y empresa_id
+        empleado_id = validated_data.pop("empleado_id")
+        empresa_id = validated_data.pop("empresa_id")
+
+        # 5) Creamos el gasto **incluyendo** fecha_gasto
         gasto = Gasto.objects.create(
             viaje=viaje,
             dia=dia,
+            fecha_gasto=fecha,
+            empleado_id=empleado_id,
+            empresa_id=empresa_id,
             **validated_data
         )
         return gasto
+
+
 class DiaViajeSerializer(serializers.ModelSerializer):
     """Serializador para representar cada día de viaje junto con sus gastos"""
     gastos = GastoSerializer(many=True, read_only=True)
@@ -168,6 +177,24 @@ class DiaViajeSerializer(serializers.ModelSerializer):
         instance.revisado = validated_data.get('revisado', instance.revisado)
         instance.save()
         return instance
+
+
+class NotaViajeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notas
+        fields = ['id','viaje','empleado', 'contenido', 'fecha_creacion']
+        read_only_fields = ['id', 'fecha_creacion', 'empleado']
+"""
+
+este es un serializer viejo que funciona, lo guardo para no perderlo
+class NotaViajeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notas
+        fields = ['id', 'viaje', 'empleado', 'contenido', 'fecha_creacion']
+        read_only_fields = ['id', 'fecha_creacion', 'empleado']
+
+
+"""
 
 
 class ViajeSerializer(serializers.ModelSerializer):
@@ -226,19 +253,98 @@ class ViajeSerializer(serializers.ModelSerializer):
         return viaje
 
 
+
+"""2do serializer para manejar viajes y cálculo automático de días con destino y país"""
+class ViajeSerializer(serializers.ModelSerializer):
+    empleado_id = serializers.IntegerField(write_only=True)
+    empresa_id = serializers.IntegerField(write_only=True)
+    empleado = EmpleadoProfileSerializer(read_only=True)
+    empresa = EmpresaProfileSerializer(read_only=True)
+    destino = serializers.CharField()
+    ciudad = serializers.CharField(read_only=True)
+    pais = serializers.CharField(read_only=True)
+    es_internacional = serializers.BooleanField(read_only=True)
+    dias_viajados = serializers.IntegerField(read_only=True)
+    notas = NotaViajeSerializer(many=True,read_only=True)
+
+    class Meta:
+        model = Viaje
+        fields = [
+            'id', 'empleado', 'empresa',
+            'destino', 'ciudad', 'pais', 'es_internacional',
+            'fecha_inicio', 'fecha_fin', 'estado', 'fecha_solicitud',
+            'empleado_id', 'empresa_id', 'empresa_visitada', 'motivo',
+            'dias_viajados','notas'
+        ]
+        read_only_fields = [
+            'id', 'empleado', 'empresa',
+            'fecha_solicitud',
+            'ciudad', 'pais', 'es_internacional',
+            'dias_viajados'
+        ]
+
+    def create(self, validated_data):
+        # 1) Sacamos los IDs
+        empleado = EmpleadoProfile.objects.get(id=validated_data.pop('empleado_id'))
+        empresa = EmpresaProfile.objects.get(id=validated_data.pop('empresa_id'))
+
+        # 2) Sacamos y eliminamos destino de validated_data
+        destino = validated_data.pop('destino', '').strip()
+
+        # 3) Extraemos ciudad y país
+        parts = [p.strip() for p in destino.split(',', 1)]
+        if len(parts) == 2:
+            ciudad, pais = parts
+        else:
+            ciudad, pais = parts[0], ''
+
+        # Normalize country for Spanish aliases
+        pais_norm = pais.strip().lower()
+        nacional_aliases = ('españa', 'espana', 'spain')
+        es_int = not (pais_norm in nacional_aliases)
+
+        # 5) Días de viaje
+        fecha_inicio = validated_data['fecha_inicio']
+        fecha_fin = validated_data['fecha_fin']
+        dias = (fecha_fin - fecha_inicio).days + 1
+
+        # 6) Validaciones (motivo, duplicados…)
+        motivo = validated_data.get('motivo', '')
+        if motivo and len(motivo) > 500:
+            raise serializers.ValidationError({'motivo': 'El motivo no puede superar los 500 caracteres'})
+
+        if Viaje.objects.filter(
+                empresa=empresa,
+                destino=destino,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                estado='PENDIENTE'
+        ).exists():
+            raise serializers.ValidationError(
+                {'error': 'Ya existe un viaje pendiente a este destino en estas fechas para la empresa.'}
+            )
+
+        # 7) Creamos el viaje
+        viaje = Viaje.objects.create(
+            empleado=empleado,
+            empresa=empresa,
+            destino=destino,
+            ciudad=ciudad,
+            pais=pais,
+            es_internacional=es_int,
+            dias_viajados=dias,
+            **validated_data
+        )
+        return viaje
+
+
 class NotificacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Notificacion
         fields = ["id", "tipo", "mensaje", "fecha_creacion", "leida"]
 
 
-# serializers.py
 
-class NotaViajeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Notas
-        fields = ['id', 'viaje', 'empleado', 'contenido', 'fecha_creacion']
-        read_only_fields = ['id', 'fecha_creacion', 'empleado']
 
 
 class MensajeJustificanteSerializer(serializers.ModelSerializer):
@@ -249,7 +355,7 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MensajeJustificante
-        fields = ["id", "gasto", "autor", "motivo", "respuesta", "estado", "archivo_justificante_url", "fecha_creacion",
+        fields = ["id", "gasto","destinatario", "autor", "motivo", "respuesta", "estado", "archivo_justificante_url", "fecha_creacion",
                   "gasto_id", "remitente"]
         read_only_fields = ["id", "fecha_creacion", "autor", "archivo_justificante_url", "gasto_id"]
 
@@ -263,4 +369,79 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
             return obj.archivo_justificante.url
         return None
 
+    def validate(self, data):
+        if not data.get("gasto") and not data.get("destinatario"):
+            raise serializers.ValidationError(
+                "Debes indicar un gasto _o_ un destinatario"
+            )
+        return data
 
+class ConversacionSerializer(serializers.ModelSerializer):
+    participantes = serializers.StringRelatedField(many=True)
+    class Meta:
+        model = Conversacion
+        fields = ['id', 'gasto', 'participantes', 'fecha_creacion']
+
+class MensajeSerializer(serializers.ModelSerializer):
+    autor = serializers.StringRelatedField()
+    archivo = serializers.FileField(read_only=True)
+    class Meta:
+        model = Mensaje
+        fields = ['id', 'conversacion', 'autor', 'contenido', 'archivo', 'fecha_creacion']
+
+class CompanyTripsSummarySerializer(serializers.Serializer):
+    empresa = serializers.CharField()
+    trips = serializers.IntegerField()
+    days = serializers.IntegerField()
+    nonExemptDays = serializers.IntegerField()
+
+
+class TripsPerMonthSerializer(serializers.Serializer):
+    month = serializers.CharField()     # ej. '2025-03'
+    totalDays = serializers.IntegerField()
+
+class TripsTypeSerializer(serializers.Serializer):
+    national = serializers.IntegerField()
+    international = serializers.IntegerField()
+
+class ExemptDaysSerializer(serializers.Serializer):
+    exempt = serializers.IntegerField()
+    nonExempt = serializers.IntegerField()
+
+class GeneralInfoSerializer(serializers.Serializer):
+    companies            = serializers.IntegerField()
+    employees            = serializers.IntegerField()
+    international_trips  = serializers.IntegerField()
+    national_trips       = serializers.IntegerField()
+
+"""es un nuevo serializador que estoy probando para ver si funciona mejor"""
+class PendingTripSerializer(serializers.ModelSerializer):
+    tripDates   = serializers.SerializerMethodField()
+    destination = serializers.CharField(source='destino')
+    info        = serializers.CharField(source='motivo')
+    notes       = serializers.SerializerMethodField()
+    employeeName = serializers.SerializerMethodField()
+    companyVisited = serializers.CharField(source='empresa_visitada')
+
+    class Meta:
+        model = Viaje
+        fields = ['id', 'tripDates', 'destination', 'info', 'notes', 'employeeName','companyVisited']
+
+    def get_tripDates(self, obj):
+        # devolvemos [fecha_inicio, fecha_fin] en ISO
+        return [obj.fecha_inicio.isoformat(), obj.fecha_fin.isoformat()]
+
+    def get_notes(self, obj):
+        # si usas tu modelo Notas:
+        return [n.contenido for n in obj.notas.all()]
+
+    def get_employeeName(self, obj):
+        # Asegúrate de que el viaje tenga prefetched empleado
+        return f"{obj.empleado.nombre} {obj.empleado.apellido}"
+
+
+class EmpresaPendingSerializer(serializers.ModelSerializer):
+    """Solo campos esenciales para la lista de empresas con viajes pendientes."""
+    class Meta:
+        model = EmpresaProfile
+        fields = ['id', 'nombre_empresa']

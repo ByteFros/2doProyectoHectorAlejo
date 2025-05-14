@@ -1,31 +1,55 @@
-from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.authtoken.models import Token
-from django.contrib.auth import authenticate
+from .models import EmpresaProfile, EmpleadoProfile
 from .serializers import CustomUserSerializer, RegisterUserSerializer
-
+from rest_framework import status
+from rest_framework.permissions import AllowAny
+from rest_framework.authtoken.models import Token
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.contrib.auth import authenticate
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """Autentica un usuario y devuelve su token"""
+        """Autentica un usuario y devuelve su token y sus IDs."""
         username = request.data.get('username')
         password = request.data.get('password')
 
         user = authenticate(username=username, password=password)
+        if not user:
+            return Response(
+                {"error": "Credenciales inválidas"},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 
-        if user:
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({"token": token.key,
-                             "role": user.role,
-                             "must_change_password": user.must_change_password  # ⬅️ ESTA LÍNEA ES LA CLAVE
-                             }, status=status.HTTP_200_OK)
+        token, _ = Token.objects.get_or_create(user=user)
 
-        return Response({"error": "Credenciales inválidas"}, status=status.HTTP_401_UNAUTHORIZED)
+        # Base de la respuesta
+        resp = {
+            "token": token.key,
+            "role": user.role,
+            "must_change_password": user.must_change_password,
+            "user_id": user.id,
+        }
+
+        # Si es empresa, adjuntamos su perfil
+        if user.role == "EMPRESA":
+            try:
+                resp["empresa_id"] = user.empresa_profile.id
+            except EmpresaProfile.DoesNotExist:
+                # opcional: log / warning de inconsistencia
+                resp["empresa_id"] = None
+
+        # Si es empleado, adjuntamos su perfil
+        if user.role == "EMPLEADO":
+            try:
+                resp["empleado_id"] = user.empleado_profile.id
+            except EmpleadoProfile.DoesNotExist:
+                resp["empleado_id"] = None
+
+        return Response(resp, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

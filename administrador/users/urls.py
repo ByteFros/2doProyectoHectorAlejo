@@ -1,16 +1,22 @@
 from django.urls import path
 
 from .auth_views import LoginView, LogoutView, RegisterUserView
+from .dias_views import DiaViajeListView, DiaViajeUpdateView
 from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
-    RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView
+    RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView, PendingCompaniesView, \
+    PendingEmployeesByCompanyView
 from .gastos_views import CrearGastoView, AprobarRechazarGastoView, GastoListView, GastoUpdateDeleteView, \
     GastoComprobanteDownloadView
 from .messages_views import SolicitarJustificanteView, ListarMensajesView, ResponderMensajeView, \
-    CambiarEstadoJustificacionView, DescargarArchivoMensajeView
+    CambiarEstadoJustificacionView, DescargarArchivoMensajeView, EnviarMensajeView, ListarConversacionesView, \
+    CrearConversacionView, ListarMensajesByIdView, DescargarAdjuntoMensajeView
 from .notas_views import NotaViajeListCreateView, NotaViajeDeleteView
 from .notificaciones_views import ListaNotificacionesView, CrearNotificacionView
+from .report_views import CompanyTripsSummaryView, TripsPerMonthView, TripsTypeView, ExemptDaysView, GeneralInfoView, \
+    EmployeeTripsSummaryView
 from .viajes_views import CrearViajeView, AprobarRechazarViajeView, FinalizarViajeView, IniciarViajeView, \
-    ListarViajesFinalizadosView, ListarTodosLosViajesView, CancelarViajeView, ViajeEnCursoView
+    ListarViajesFinalizadosView, ListarTodosLosViajesView, CancelarViajeView, ViajeEnCursoView, \
+    PendingTripsByEmployeeView, PendingTripsDetailView
 from .views import UserDetailView, EmployeeListView, PasswordResetRequestView, \
     PasswordResetConfirmView, ChangePasswordView, EmpleadosPorEmpresaView
 
@@ -44,10 +50,16 @@ urlpatterns = [
     path("viajes/<int:viaje_id>/", AprobarRechazarViajeView.as_view(), name="aprobar_rechazar_viaje"),
     path("viajes/<int:viaje_id>/iniciar/", IniciarViajeView.as_view(), name="iniciar_viaje"),
     path("viajes/<int:viaje_id>/end/", FinalizarViajeView.as_view(), name="finalizar_viaje"),
-    path("viajes/over/", ListarViajesFinalizadosView.as_view(), name="viajes_aprobados"),
+    path("viajes/over/", ListarViajesFinalizadosView.as_view(), name="viajes-finalizados"),
+    path('empresas/<int:empresa_id>/empleados/<int:empleado_id>/viajes/pending/',PendingTripsByEmployeeView.as_view(),name='pending-trips-by-employee'),
+    path('empresas/<int:empresa_id>/empleados/pending/',PendingEmployeesByCompanyView.as_view(),name='pending-employees-by-company'),
     path("viajes/en-curso/", ViajeEnCursoView.as_view(), name="viaje_en_curso"),
     path("viajes/all/", ListarTodosLosViajesView.as_view(), name="viajes_todos"),
+    path('viajes/pending/', PendingTripsDetailView.as_view(), name='pending-trips-count'),
     path("viajes/<int:viaje_id>/cancelar/", CancelarViajeView.as_view(), name="cancel"),
+    #validacion de dias
+    path('viajes/<int:viaje_id>/dias/', DiaViajeListView.as_view(), name='dias-list'),
+    path('viajes/<int:viaje_id>/dias/<int:dia_id>/', DiaViajeUpdateView.as_view(), name='dias-update'),
 
     # Contraseña
     path("password-reset-request/", PasswordResetRequestView.as_view(), name="password_reset"),
@@ -64,7 +76,23 @@ urlpatterns = [
 
     #Mensajes
     path("mensajes/", ListarMensajesView.as_view(), name="listar_mensajes"),
+    path('mensajes/enviar/', EnviarMensajeView.as_view(), name='enviar_mensaje'),
     path("mensajes/<int:mensaje_id>/responder/", ResponderMensajeView.as_view(), name="responder_mensaje"),
     path("mensajes/<int:mensaje_id>/cambiar-estado/", CambiarEstadoJustificacionView.as_view(), name="cambiar_estado_justificante"),
-    path("mensajes/<int:mensaje_id>/file/", DescargarArchivoMensajeView.as_view()),
+    path("mensajes/justificante/<int:mensaje_id>/file/", DescargarArchivoMensajeView.as_view()),
+    path("mensajes/<int:mensaje_id>/file/", DescargarAdjuntoMensajeView.as_view(), name="descargar_adjunto_mensaje"),
+
+    #Conversaciones
+    path('conversaciones/', ListarConversacionesView.as_view(), name='listar_conversaciones'),
+    path('conversaciones/crear/', CrearConversacionView.as_view(), name='crear_conversacion'),
+    path('conversaciones/<int:conversacion_id>/mensajes/', ListarMensajesByIdView.as_view(), name='listar_mensajes'),
+
+    #endpoints optimizados
+    path('report/viajes/', CompanyTripsSummaryView.as_view(), name='company-trips-summary'),
+    path('report/trips-per-month/', TripsPerMonthView.as_view(), name='trips-per-month'),
+    path('report/trips-type/', TripsTypeView.as_view(), name='trips-type'),
+    path('report/exempt-days/', ExemptDaysView.as_view(), name='exempt-days'),
+    path('report/general-info/', GeneralInfoView.as_view(), name='general-info'),
+    path('report/companies/pending/',PendingCompaniesView.as_view(),name='pending-companies'),
+    path('report/empleados/',EmployeeTripsSummaryView.as_view(),name='employee-trips-summary'),
 ]
