@@ -2,7 +2,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
 
-from .models import EmpleadoProfile, Viaje, EmpresaProfile, Notificacion, DiaViaje
+from .models import EmpleadoProfile, Viaje, EmpresaProfile, Notificacion, DiaViaje, Conversacion, Mensaje
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -245,6 +245,7 @@ class FinalizarViajeView(APIView):
 
             return Response({'message': 'Días revisados correctamente.'}, status=status.HTTP_200_OK)
 
+
 class CancelarViajeView(APIView):
     """Permite a un empleado cancelar un viaje antes de que comience"""
     authentication_classes = [TokenAuthentication]
@@ -332,6 +333,7 @@ class ListarViajesFinalizadosView(APIView):
 
         serializer = ViajeSerializer(viajes, many=True)
         return Response(serializer.data, status=200)
+
 
 class PendingTripsByEmployeeView(APIView):
     """
@@ -431,3 +433,115 @@ class PendingTripsDetailView(APIView):
             "count": viajes_qs.count(),
             "trips": serializer.data
         }, status=200)
+
+
+class FinalizarRevisionViajeView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, viaje_id):
+        user = request.user
+        motivo = request.data.get("motivo", "").strip()
+        dias_data = request.data.get("dias", [])
+
+        if not isinstance(dias_data, list) or not all('id' in d and 'exento' in d for d in dias_data):
+            return Response({"error": "Formato de días inválido"}, status=400)
+
+        viaje = get_object_or_404(Viaje, id=viaje_id, estado='EN_REVISION')
+
+        # Validación de permisos
+        if user.role == 'EMPRESA':
+            empresa = get_object_or_404(EmpresaProfile, user=user)
+            if viaje.empresa != empresa:
+                return Response({'error': 'No autorizado'}, status=403)
+        elif user.role != 'MASTER':
+            return Response({'error': 'No autorizado'}, status=403)
+
+        # Mapear días enviados
+        id_a_exento = {d['id']: d['exento'] for d in dias_data}
+        dias_viaje = viaje.dias.all()
+        ids_validos = set(d.id for d in dias_viaje)
+
+        # Validación de que todos los días pertenezcan al viaje
+        if not set(id_a_exento.keys()).issubset(ids_validos):
+            return Response({"error": "Uno o más días no pertenecen al viaje"}, status=400)
+
+        # Procesar cada día
+        dias_no_exentos = []
+        for dia in dias_viaje:
+            exento = id_a_exento.get(dia.id, dia.exento)
+            dia.exento = exento
+            dia.revisado = True
+            dia.save()
+
+            estado_gasto = "RECHAZADO" if not exento else "APROBADO"
+            dia.gastos.update(estado=estado_gasto)
+
+            if not exento:
+                dias_no_exentos.append(dia)
+
+        # Crear conversación si hay días no exentos
+        if dias_no_exentos and motivo:
+            conversacion = Conversacion.objects.create(viaje=viaje)
+            conversacion.participantes.add(user, viaje.empleado.user)
+
+            mensaje = Mensaje.objects.create(
+                conversacion=conversacion,
+                autor=user,
+                contenido=motivo
+            )
+
+        # Marcar viaje como finalizado
+        viaje.estado = "FINALIZADO"
+        viaje.save()
+
+        return Response({"message": "Revisión finalizada. Conversación creada si fue necesario."}, status=200)
+
+
+
+class EmployeeCityStatsView(APIView):
+    """Devuelve estadísticas de ciudades visitadas por un empleado (viajes finalizados)."""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+
+        if user.role != 'EMPLEADO':
+            return Response({"error": "No autorizado"}, status=403)
+
+        try:
+            empleado = EmpleadoProfile.objects.get(user=user)
+        except EmpleadoProfile.DoesNotExist:
+            return Response({"error": "Perfil de empleado no encontrado"}, status=404)
+
+        # Traer todos los viajes finalizados del empleado
+        viajes = Viaje.objects.filter(empleado=empleado, estado='FINALIZADO')
+
+        # Agrupación manual por ciudad
+        city_stats = {}
+
+        for viaje in viajes:
+            ciudad = viaje.ciudad or viaje.destino.split(',')[0].strip()
+            dias = viaje.dias_viajados or 1
+
+            # Calcular días exentos y no exentos
+            dias_relacionados = DiaViaje.objects.filter(viaje=viaje)
+            exentos = dias_relacionados.filter(exento=True).count()
+            no_exentos = dias_relacionados.filter(exento=False).count()
+
+            if ciudad not in city_stats:
+                city_stats[ciudad] = {
+                    'city': ciudad,
+                    'trips': 1,
+                    'days': dias,
+                    'nonExemptDays': no_exentos,
+                    'exemptDays': exentos,
+                }
+            else:
+                city_stats[ciudad]['trips'] += 1
+                city_stats[ciudad]['days'] += dias
+                city_stats[ciudad]['nonExemptDays'] += no_exentos
+                city_stats[ciudad]['exemptDays'] += exentos
+
+        return Response(list(city_stats.values()), status=200)

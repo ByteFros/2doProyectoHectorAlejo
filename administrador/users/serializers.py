@@ -390,6 +390,7 @@ class MensajeSerializer(serializers.ModelSerializer):
         fields = ['id', 'conversacion', 'autor', 'contenido', 'archivo', 'fecha_creacion']
 
 class CompanyTripsSummarySerializer(serializers.Serializer):
+    empresa_id = serializers.IntegerField()
     empresa = serializers.CharField()
     trips = serializers.IntegerField()
     days = serializers.IntegerField()
@@ -403,6 +404,8 @@ class TripsPerMonthSerializer(serializers.Serializer):
 class TripsTypeSerializer(serializers.Serializer):
     national = serializers.IntegerField()
     international = serializers.IntegerField()
+    total = serializers.IntegerField()
+    total_days = serializers.IntegerField()
 
 class ExemptDaysSerializer(serializers.Serializer):
     exempt = serializers.IntegerField()

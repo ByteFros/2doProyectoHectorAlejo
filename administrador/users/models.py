@@ -130,7 +130,7 @@ class DiaViaje(models.Model):
     fecha = models.DateField()
     """TODO
      se ha de corregir el estado de los dias exentos y no exentos para la puñetera empresa """
-    exento = models.BooleanField(default=False)
+    exento = models.BooleanField(default=True)
     revisado = models.BooleanField(default=False)
 
 
