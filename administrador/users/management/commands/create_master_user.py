@@ -5,14 +5,14 @@ class Command(BaseCommand):
     help = "Crea un usuario MASTER por defecto"
 
     def handle(self, *args, **kwargs):
-        if not CustomUser.objects.filter(email="admin@admin.com").exists():
+        if not CustomUser.objects.filter(username="admin").exists():
             CustomUser.objects.create_superuser(
                 username="admin",
                 email="admin@admin.com",
                 password="admin123",
                 first_name="Admin",
                 last_name="Master",
-                role="MASTER"  # Asegúrate de que 'MASTER' sea el valor correcto
+                role="MASTER"
             )
             self.stdout.write(self.style.SUCCESS("Usuario MASTER creado exitosamente."))
         else:

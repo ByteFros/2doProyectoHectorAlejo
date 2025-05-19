@@ -1,0 +1,256 @@
+// Variables globales reutilizadas
+$primary-color: #007bff;
+$hover-color: #0056b3;
+$background-color: #f4f6f9;
+$button-background: #e0e0e0;
+$border-radius: 8px;
+$shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+$transition: all 0.3s ease-in-out;
+
+/* Contenedor general para gestión */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: calc(100vw - 200px);
+  height: calc(100vh - 60px);
+  padding: 20px;
+  font-family: 'Arial', sans-serif;
+  box-sizing: border-box;
+  overflow-x: auto;
+}
+
+/* Botonera como pestañas */
+.buttonGroup {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: $border-radius;
+
+  button {
+    padding: 10px 15px;
+    font-size: 1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: $border-radius;
+    background: $button-background;
+    cursor: pointer;
+    transition: $transition;
+
+    &:hover {
+      background: $hover-color;
+      color: white;
+    }
+
+    &.active {
+      background: $primary-color;
+      color: white;
+      box-shadow: 0 3px 8px rgba(0, 123, 255, 0.3);
+    }
+  }
+}
+
+/* Sticky para la botonera */
+.sticky {
+  position: sticky;
+  top: 40px;
+  z-index: 10;
+  background: white;
+}
+
+/* Área de contenido (forms / tablas) */
+.content {
+  background: white;
+  width: 90%;
+  max-width: 780px;
+  min-width: 320px; /*  añadido: mínimo de ancho */
+  padding: 20px;
+  border-radius: $border-radius;
+  box-shadow: $shadow;
+  overflow-x: auto; /*  añadido: scroll horizontal si es necesario */
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Formulario general */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: $border-radius;
+    font-size: 1rem;
+    transition: $transition;
+    background: white;
+
+    &:focus {
+      outline: none;
+      border-color: $primary-color;
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    }
+  }
+
+  label {
+    font-size: 0.9rem;
+    color: #444;
+    margin-bottom: 5px;
+  }
+
+  button {
+    margin-top: 15px;
+    padding: 12px;
+    border: none;
+    border-radius: $border-radius;
+    background: $primary-color;
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: $transition;
+
+    &:hover {
+      background: $hover-color;
+    }
+  }
+}
+
+/* Tabla de empresas */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px; /* mínimo para evitar aplastar columnas */
+
+  th,
+  td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 0.95rem;
+  }
+
+  th {
+    background-color: #f1f1f1;
+    font-weight: bold;
+  }
+
+  tr:hover {
+    background-color: #f9f9f9;
+  }
+}
+
+/* 🚀 RESPONSIVE: ADAPTACIONES */
+@media (max-width: 1024px) {
+  .container {
+    width: 100vw;
+    height: auto;
+    margin-left: 150px;
+    padding: 15px;
+  }
+
+  .buttonGroup {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .content {
+    width: 95%;
+    max-width: 700px;
+    padding: 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: 100vw;
+    height: auto;
+    padding: 10px;
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .content {
+    width: 95%;
+    max-width: 90%;
+    padding: 15px;
+  }
+
+  .form {
+    input,
+    select,
+    textarea {
+      font-size: 0.95rem;
+    }
+
+    button {
+      width: 100%;
+    }
+  }
+
+  .table {
+    th, td {
+      font-size: 0.85rem;
+      padding: 8px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 10px 5px;
+  }
+
+  .content {
+    width: 100%;
+    padding: 10px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .form {
+    gap: 10px;
+
+    input,
+    select,
+    textarea {
+      font-size: 0.9rem;
+      padding: 8px;
+    }
+
+    label {
+      font-size: 0.85rem;
+    }
+  }
+
+  .buttonGroup {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+
+    button {
+      width: 100%;
+      padding: 10px;
+      font-size: 0.95rem;
+    }
+  }
+
+  .table {
+    th, td {
+      font-size: 0.8rem;
+      padding: 6px;
+    }
+  }
+}

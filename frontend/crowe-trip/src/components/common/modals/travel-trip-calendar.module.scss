@@ -1,0 +1,422 @@
+.container {
+  overflow-y: auto;           // 🔥 scroll vertical
+  box-sizing: border-box;
+}
+
+.backButton {
+  background-color: #e5e7eb;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #d1d5db;
+  }
+}
+
+.title {
+  font-size: 1.2rem;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+.dayBox {
+  background-color: #f9fafb;
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.dayHeader {
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: #3b82f6;
+}
+
+.noExpenses {
+  font-style: italic;
+  color: #9ca3af;
+}
+
+.expenseItem {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.description {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.description::before {
+  font-size: 1.2rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.actions button,
+.linkButton {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.actions button:hover,
+.linkButton:hover {
+  filter: brightness(0.95);
+}
+
+.actions button:nth-child(1) {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.actions button:nth-child(2) {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.linkButton {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  text-decoration: none;
+}
+
+.pending {
+  border-left: 5px solid transparent;
+  background-color: #ffe0b8;
+}
+
+.validated {
+  border-left: 5px solid #10b981;
+  background-color: #ecfdf5;
+}
+
+.rejected {
+  border-left: 5px solid #ef4444;
+  background-color: #fef2f2;
+}
+
+.justify-requested {
+  border-left: 5px solid #f59e0b;
+  background-color: #fffbeb;
+}
+
+.linkButton {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 0.25rem 0.5rem;
+  text-decoration: none;
+  transition: background 0.2s ease;
+  display: inline-block;
+
+  &:hover {
+    background-color: #bae6fd;
+  }
+}
+
+/* Estilos para la previsualización de archivos */
+.filePreviewBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 8001;
+  padding: 2rem;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.filePreviewModal {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+.closePreviewButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.9);
+  border: none;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #f1f1f1;
+  }
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 85vh;
+  object-fit: contain;
+  padding: 1rem;
+  margin: 0 auto;
+  display: block;
+}
+
+/* Estilos para el objeto que mostrará todos los tipos de archivo */
+.previewObject {
+  width: 100%;
+  height: 100%;
+  min-height: 65vh;
+  border: none;
+  display: block;
+}
+
+.filePreviewHeader {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative; /* Para posicionamiento absoluto del botón cerrar */
+}
+
+.filePreviewTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0;
+  max-width: 70%; /* Limitar ancho para evitar chocar con botones */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filePreviewContent {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background-color: #f5f5f5;
+  position: relative;
+  width: 100%;
+  height: 65vh;
+  min-height: 65vh;
+}
+
+/* Estilos para cuando hay un error al cargar */
+.fileError {
+  padding: 2rem;
+  text-align: center;
+  background-color: #fee2e2;
+  border-radius: 0.5rem;
+  color: #991b1b;
+  max-width: 80%;
+  margin: 0 auto;
+}
+
+.fileError a {
+  display: inline-block;
+  margin-top: 1rem;
+  background-color: #ef4444;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 500;
+  
+  &:hover {
+    background-color: #dc2626;
+  }
+}
+
+.fileActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto; /* Empuja los botones a la derecha */
+}
+
+.fileActionButton {
+  background-color: #e0f2fe;
+  color: #0369a1;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &:hover {
+    background-color: #bae6fd;
+  }
+}
+
+/* Ajuste específico para botón de descarga */
+.fileActionButton.downloadButton {
+  margin-right: 2.5rem; /* Espacio para evitar superposición con botón cerrar */
+}
+
+.fileTypeIcon {
+  font-size: 1.5rem;
+  margin-right: 0.5rem;
+}
+
+.pdfIcon {
+  color: #dc2626;
+}
+
+.imageIcon {
+  color: #2563eb;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Estilos específicos para diferentes tipos de archivos */
+.pdfPreview {
+  .filePreviewHeader {
+    border-top: 3px solid #ef4444;
+  }
+}
+
+.imagePreview {
+  .filePreviewHeader {
+    border-top: 3px solid #3b82f6;
+  }
+}
+
+/* Estilos para indicador de carga */
+.loadingIndicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem;
+  color: #6b7280;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Para los montos */
+.expenseInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.montoLabel {
+  background-color: #f3f4f6;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filePreviewModal {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .previewImage, .previewObject {
+    max-height: 60vh;
+  }
+  
+  .filePreviewContent {
+    height: 60vh;
+    min-height: 60vh;
+  }
+  
+  .filePreviewHeader {
+    padding-right: 3rem; /* Espacio para el botón de cerrar */
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .fileActions {
+    margin-right: 0;
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap; /* Permite que los botones caigan a la siguiente línea si es necesario */
+  }
+  
+  .filePreviewTitle {
+    max-width: 100%; /* En móvil, título puede usar todo el ancho */
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* Asegurarse que el PDF llene el espacio */
+embed[type="application/pdf"],
+object[type="application/pdf"] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 65vh !important;
+}

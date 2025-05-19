@@ -1,0 +1,121 @@
+/* 🧱 Contenedor principal, sin scroll externo */
+.masterContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; // bloquea scroll global
+}
+
+/* 📦 Workspace maneja TODO el scroll interno */
+.workspace {
+  flex-grow: 1;
+  width: 100%;
+  max-width: 100%;
+  height: calc(100vh - 60px); 
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  margin-left: 220px; // espacio para el sidebar
+  margin-top: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  flex-direction: column;
+
+  //  Control de scroll visible aquí
+  overflow-x: auto;
+  overflow-y: auto;
+}
+
+/* Scroll vertical adicional (opcional para ciertos contenidos) */
+.dashboardScroll {
+  overflow-y: auto;
+}
+
+/* Grid para las secciones del dashboard */
+.dashboardGrid {
+  display: flex;
+  gap: 2rem;
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4rem;
+  flex-wrap: wrap;
+  box-sizing: border-box;
+}
+
+/* Secciones generales del dashboard */
+.chartSection,
+.tableSection {
+  flex: 1;
+  min-width: 300px;
+  background-color: transparent;
+  padding: 0;
+  box-shadow: none;
+  border: none;
+  margin-bottom: 1rem;
+}
+
+/* Fila de gráficos de pastel */
+.pieChartsRow {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-bottom: 2.5rem;
+}
+
+/* Secciones que deben ocupar ancho completo */
+.fullWidthSection {
+  width: 100%;
+}
+
+/* Espaciador final para separación visual */
+.contentEndSpacer {
+  height: 1rem;
+  width: 100%;
+}
+
+/* 📱 Media Queries - Responsive */
+@media (max-width: 1024px) {
+  .workspace {
+    width: 100vw;
+    margin-left: 0;
+  }
+
+  .dashboardGrid {
+    flex-direction: column;
+    padding-top: 2rem;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace {
+    width: 100vw;
+    margin-left: 0;
+    padding: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .dashboardGrid {
+    padding: 1rem;
+  }
+
+  .chartSection,
+  .tableSection {
+    min-width: 100%;
+  }
+
+  .workspace {
+    padding: 10px;
+    height: auto; // permite altura flexible en móviles si es necesario
+  }
+}

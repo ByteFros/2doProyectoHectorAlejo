@@ -1,0 +1,124 @@
+.tableWrapper {
+  overflow-x: auto;
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: white;
+  max-width: 100%;
+}
+
+/* Tabla principal */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Segoe UI', sans-serif;
+
+  th,
+  td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+  }
+
+  th {
+    background-color: #f4f6f9;
+    color: #333;
+    font-weight: 600;
+  }
+
+  td input[type='checkbox'] {
+    transform: scale(1.2);
+    cursor: pointer;
+  }
+}
+
+.fadeOutRow {
+  animation: fadeOutSlide 0.4s ease forwards;
+}
+
+@keyframes fadeOutSlide {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30px);
+    height: 0;
+  }
+}
+
+.deleteBtn {
+  background-color: #e74c3c;
+  color: white;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+
+  &:hover {
+    background-color: #c0392b;
+  }
+}
+
+.noData {
+  text-align: center;
+  padding: 1rem;
+  color: #777;
+}
+
+.checkboxCell {
+  text-align: center;
+  vertical-align: middle;
+
+  input[type='checkbox'] {
+    transform: scale(1.2);
+    cursor: pointer;
+  }
+}
+
+/* 📱 RESPONSIVE SECTION */
+@media (max-width: 768px) {
+  .table {
+    font-size: 0.9rem;
+
+    th,
+    td {
+      padding: 10px 12px;
+      max-width: 140px;
+    }
+
+    .deleteBtn {
+      padding: 5px 10px;
+      font-size: 0.75rem;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .table {
+    font-size: 0.85rem;
+
+    th,
+    td {
+      padding: 8px 10px;
+      max-width: 120px;
+    }
+
+    .deleteBtn {
+      padding: 4px 8px;
+      font-size: 0.7rem;
+    }
+  }
+
+  .tableWrapper {
+    box-shadow: none;
+    border-radius: 0;
+  }
+}

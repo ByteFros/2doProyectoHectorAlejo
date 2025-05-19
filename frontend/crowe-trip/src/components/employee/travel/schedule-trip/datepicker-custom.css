@@ -1,0 +1,56 @@
+/* Ajusta el tamaño del calendario */
+.react-datepicker {
+    font-size: 14px;
+    width: 100%;
+    max-height: 500px;
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Asegura que el mes y año sean visibles */
+.react-datepicker__current-month {
+    font-size: 1.1rem !important;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Mejora los botones de navegación */
+.react-datepicker__navigation {
+    width: 36px !important;
+    height: 36px !important;
+}
+
+/* Estiliza los días seleccionados */
+.react-datepicker__day--selected, 
+.react-datepicker__day--in-range {
+    background-color: #007bff !important;
+    color: white !important;
+    border-radius: 6px !important;
+}
+
+/* Evita que el calendario se abra en una posición incorrecta */
+.react-datepicker-popper {
+    z-index: 9999 !important;
+}
+
+/* Acomoda los inputs */
+.input-group {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Estiliza el input del selector */
+.custom-datepicker {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+}
+
+/* Evita que el calendario se expanda descontroladamente */
+.react-datepicker__month-container {
+    width: auto !important;
+}

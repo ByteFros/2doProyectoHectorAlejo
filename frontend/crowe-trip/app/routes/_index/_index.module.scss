@@ -1,0 +1,31 @@
+.root {
+    margin: 0 auto;
+    padding: 2.3em 3em 2em;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid var(--secondary);
+    border-radius: 30px;
+    width: 100vw;
+    min-height: 100vh;
+    justify-content: center;
+    background-color: var(--primary);
+}
+
+.title {
+    font: var(--large-font);
+    color: var(--black);
+}
+
+.paragraph {
+    font-size: 12px;
+    margin-top: 80px;
+    gap: 3px;
+    justify-content: center;
+    font: var(--paragraph-font);
+    color: var(--black);
+}
+
+.detail {
+    font: var(--small-font);
+}

@@ -1,0 +1,103 @@
+.currentTrip {
+    padding: 20px;
+    border-radius: 10px;
+    min-width: 800px;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+
+    h3 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 15px;
+    }
+
+    .tripDetails {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        position: relative;
+    }
+
+    /* Botón "Cargar Gasto" alineado a la derecha */
+    .tripButtons {
+        position: absolute;
+        right: 15px;
+        top: 25%;
+        transform: translateY(-50%);
+    }
+
+    /* Botón "Finalizar Viaje" debe ocupar todo el ancho */
+    .endTripContainer {
+        width: 100%;
+        margin-top: 15px;
+    }
+
+    .endTripButton {
+        width: 100%;
+        background: #007bff;
+        color: white;
+        padding: 12px 0;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        text-align: center;
+        transition: background 0.3s ease-in-out;
+
+        &:hover {
+            background: #0056b3;
+        }
+    }
+
+    .tripSections {
+        display: flex;
+        gap: 30px; /* 🔥 Un poco más de separación entre las tarjetas */
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    /* Forzamos que ambas tarjetas ocupen el mismo ancho */
+    .notesSection,
+    .weatherCard {
+        flex: 1;
+        width: 100%;
+        max-width: 100%;
+        padding: 20px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Eliminamos cualquier restricción que pueda estar afectando */
+    .notesSection {
+        min-width: 50% !important;
+    }
+
+    .weatherCard {
+        min-width: 50% !important;
+    }
+
+    .expenseButton {
+        background: #007bff;
+        color: white;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s ease-in-out;
+
+        &:hover {
+            background: #0056b3;
+        }
+    }
+}

@@ -1,0 +1,45 @@
+.container {
+    padding: 16px;
+    background: var(--primary);
+}
+
+.header {
+    font-size: max(10px, 1.4vw);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.6em;
+}
+
+.title {
+    font-size: max(12px, 1.8vw);
+    font-weight: 800;
+    margin-top: 0.8em;
+    margin-bottom: 2em;
+}
+
+.section:not(:last-child) {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.sectionTitle {
+    font-size: max(11px, 1.6vw);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #6e6d6d;
+    margin: 2em 0px;
+    text-transform: uppercase;
+}
+
+.item {
+    margin-bottom: max(22px, 2em);
+}
+
+.itemDescription {
+    display: block;
+    font-size: max(11px, 1.2vw);
+    padding: 1em 0;
+}
+
+b {
+    font-weight: 800;
+}

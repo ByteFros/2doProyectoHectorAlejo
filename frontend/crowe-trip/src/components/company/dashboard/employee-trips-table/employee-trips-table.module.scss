@@ -1,0 +1,48 @@
+.employeeTableWrapper {
+    max-height: 350px;
+    width: 620px;
+    overflow-y: auto;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    
+}
+
+.searchBar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: #fff;
+    padding: 0.15rem;
+    border-bottom: 1px solid #eee;
+
+    input {
+        width: 40%;
+        padding: 0.5rem;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+}
+
+.employeeTable {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 300px;
+    
+
+    .employeeHeader,
+    .employeeCell {
+        padding: 0.75rem;
+        text-align: center;
+        border-bottom: 1px solid #eee;
+    }
+
+    .employeeHeader {
+        background-color: #f5f5f5;
+        position: sticky;
+        top: 44px; // Altura del searchBar para que quede justo debajo
+        z-index: 1;
+    }
+}

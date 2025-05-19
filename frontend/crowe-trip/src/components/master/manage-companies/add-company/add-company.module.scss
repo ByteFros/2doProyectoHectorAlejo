@@ -1,0 +1,121 @@
+$primary-color: #007bff;
+$hover-color: #0056b3;
+$border-radius: 8px;
+$transition: all 0.3s ease-in-out;
+
+.formContainer {
+  width: 100%;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+
+  label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #333;
+  }
+
+  input {
+    padding: 4px;
+    border-radius: $border-radius;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+    background-color: white;
+    transition: $transition;
+
+    &:focus {
+      border-color: $primary-color;
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.4);
+      outline: none;
+    }
+  }
+}
+
+.submitButton {
+  background-color: $primary-color;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: $border-radius;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: $transition;
+
+  &:hover {
+    background-color: $hover-color;
+  }
+}
+
+.successMessage {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  padding: 0.4rem 0.4rem;
+  border-left: 6px solid #1976d2;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  text-align: center;
+  animation: fadeSlideIn 0.4s ease, fadeOut 0.5s ease 2.5s forwards;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(-5px);
+    height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+
+.checkboxGroup {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0.4rem;
+  font-size: 1rem;
+  gap: 10px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+
+    svg {
+      color: #444;
+    }
+  }
+}

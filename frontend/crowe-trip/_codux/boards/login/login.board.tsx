@@ -1,0 +1,14 @@
+import  Login  from '../../../src/components/login/login';
+import { ContentSlot, createBoard } from '@wixc3/react-board';
+import { ComponentWrapper } from '_codux/wrappers/component-wrapper';
+
+export default createBoard({
+    name: 'Login',
+    Board: () => (
+        <ComponentWrapper>
+            <ContentSlot>
+                <Login />
+            </ContentSlot>
+        </ComponentWrapper>
+    ),
+});

@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:15
@@ -9,13 +11,16 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
 
-  web:
-    build: .
+  backend:
+    build:
+      context: ./administrador
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
+      - ./administrador:/app
     environment:
       - DEBUG=True
       - DB_NAME=crowe7p
@@ -28,6 +33,25 @@ services:
     command: sh -c "python manage.py migrate &&
       python manage.py create_master_user &&
       python manage.py runserver 0.0.0.0:8000"
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend/crowe-trip
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/crowe-trip:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   postgres_data:

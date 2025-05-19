@@ -1,0 +1,600 @@
+// Improved SCSS for Messages Component
+.panel {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  width: 100%;
+  position: relative;
+  min-height: 90vh; // Aumentar para ocupar más espacio vertical
+}
+
+.leftPanel {
+  width: 300px;
+  padding-right: 1rem;
+  border-right: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh; // Limitar altura visible
+  overflow-y: auto; // Habilita scroll interno
+}
+
+// Barra de búsqueda sobre la lista de conversaciones
+.searchInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  background-color: #f9f9f9;
+  transition: all 0.2s ease;
+  
+  &:focus {
+    outline: none;
+    background: #fff;
+    box-shadow: 0 0 0 2px #4a90e2;
+  }
+}
+
+// Estilos para la lista de conversaciones
+.conversationsList {
+  width: 100%;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  flex: 1;
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 0; // Necesario para que flexbox permita overflow
+  overflow-y: auto;
+  max-height: 100%;
+
+  h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #333;
+  }
+
+  ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+}
+
+.conversationItem {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  border-left: 3px solid transparent;
+  border: 1px solid #e0e0e0;
+
+  &:hover {
+    background: #f0f0f0;
+  }
+
+  &.active {
+    background: #f0f6ff;
+    border-left: 4px solid #4a90e2;
+  }
+}
+
+.conversationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.participants {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #222;
+}
+
+.date {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.tripBadge {
+  display: inline-block;
+  background: #f0f8ff;
+  color: #0078d4;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+// Contenedor principal de mensajes
+.messagesContainer {
+  flex: 1;
+  width: 100%;
+  max-width: 800px;
+  // max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  height: 85vh; // Aumentar altura para ocupar más espacio
+  position: relative;
+  background: #f9f9f9; // Fondo sutil para el área de chat
+  border-radius: 8px;
+  margin-left: 1rem;
+}
+
+.messageList {
+  flex: 1;
+  list-style: none;
+  padding: 1rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  scroll-behavior: smooth;
+  margin: 0;
+  padding-right: 1rem;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.7));
+}
+
+.messageItem {
+  max-width: 80%;
+  padding: 1rem;
+  border-radius: 16px;
+  position: relative;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  animation: fadeIn 0.3s ease-in;
+  margin-bottom: 0.5rem;
+  
+  // Por defecto, mensajes recibidos (a la izquierda)
+  align-self: flex-start;
+  background: #ffffff;
+  border-bottom-left-radius: 4px;
+  
+  // Clase para mensajes enviados por el usuario actual (a la derecha)
+  &.sent {
+    align-self: flex-end;
+    background: #e8f0fe;
+    border-bottom-right-radius: 4px;
+  }
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+
+  strong {
+    color: #333;
+  }
+}
+
+.messageContent {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  color: #333;
+  white-space: pre-wrap;
+}
+
+.timestamp {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.expenseInfo {
+  margin-top: 0.8rem;
+  background: #e6f7ff;
+  padding: 0.5rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #0078d4;
+}
+
+.replyBox {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 12px;
+  margin: 0.5rem 1rem 1rem;
+  border: 1px solid #ccc;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.replyTextarea {
+  flex: 1;
+  resize: none;
+  padding: 0.8rem;
+  font-size: 1rem;
+  background: #f9f9f9;
+  border-radius: 24px;
+  min-height: 50px;
+  max-height: 100px;
+  border: none;
+  margin-right: 0.5rem;
+
+  &:focus {
+    outline: none;
+    background: #fff;
+    box-shadow: 0 0 0 2px #4a90e2;
+  }
+}
+
+.attachmentControls {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.fileName {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.replyButton {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  margin-top: 0.3rem;
+
+  &:hover {
+    background-color: #357ac8;
+    transform: scale(1.03);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+.justifyUpload {
+  margin-top: 0.2rem;
+
+  .uploadLabel {
+    display: inline-block;
+    background: #f0f0f0;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: background 0.3s;
+
+    input {
+      display: none;
+    }
+
+    &:hover {
+      background: #e6e6e6;
+    }
+  }
+}
+
+.viewButton {
+  background-color: #888;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #666;
+  }
+}
+
+.loading {
+  text-align: center;
+  font-size: 1.2rem;
+  color: #555;
+  margin-top: 100px;
+}
+
+.emptyState {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
+  color: #666;
+  font-size: 1.1rem;
+  font-style: italic;
+}
+
+.newMessageBox {
+  width: 100%;
+  background: #f5f5f5;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  position: relative;
+  // margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;         // No permite que crezca
+  
+  h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #333;
+  }
+}
+
+.suggestionsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: white;
+  max-height: 150px;
+  overflow-y: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.suggestionItem {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+
+  &:hover {
+    background: #f0f0f0;
+  }
+}
+
+.suggestionSubtext {
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.messageForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.messageHeader {
+  margin-bottom: 0.5rem;
+  
+  h4 {
+    margin: 0 0 0.5rem 0;
+  }
+}
+
+.recipientInfo {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.recipientCompany {
+  color: #666;
+}
+
+.messageTextarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.messageActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cancelButton {
+  background-color: #bbb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+
+  &:hover {
+    background-color: #999;
+    transform: scale(1.03);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+  
+  &:disabled {
+    background-color: #ddd;
+    cursor: not-allowed;
+    transform: none;
+  }
+}
+
+//TODO MODIFICAR POSICION DEL TOAST
+.toastNotification {
+  background: #4a90e2;
+  color: white;
+  padding: 0.5rem 1.25rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-size: 1rem;
+  margin-top: 1rem;
+  text-align: center;
+  animation: fadeInOutLocal 3s ease-in-out forwards;
+  transition: all 0.3s ease-in-out;
+}
+
+.errorMessage {
+  color: #dc3545;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  background: #fff5f5;
+  border-radius: 6px;
+  margin: 0.5rem 0;
+}
+
+.loadingMessage {
+  color: #666;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  font-style: italic;
+}
+
+.uploadLabel {
+  display: inline-flex;
+  align-items: center;
+  background: #f0f0f0;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.3s;
+
+  input {
+    display: none;
+  }
+
+  &:hover {
+    background: #e6e6e6;
+  }
+}
+
+@keyframes fadeInOutLocal {
+  0% { opacity: 0; transform: translateY(-5px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.infoMessage {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #16a34a;
+  background-color: #f0fdf4;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+}
+
+// Añadir instrucciones JavaScript para alternar clase de mensajes enviados/recibidos
+// Tienes que implementar esto en tu JS:
+// Todos los mensajes que son enviados por el usuario actual (donde msg.autor contiene el nombre del usuario actual)
+// deben tener la clase '.sent' añadida
+
+@media (max-width: 1024px) {
+  .panel {
+    flex-direction: column;
+    padding: 1rem;
+    align-items: stretch;
+    min-height: auto;
+  }
+
+  .leftPanel {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 1rem;
+    padding-right: 0;
+  }
+
+  .newMessageBox {
+    width: 100%;
+    position: static;
+    margin-bottom: 1rem;
+    z-index: auto;
+  }
+
+  .messagesContainer {
+    height: auto;
+    max-height: 60vh;
+    margin-left: 0;
+  }
+  
+  .replyBox {
+    flex-direction: column;
+  }
+  
+  .replyTextarea {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 0.5rem;
+  }
+
+  .replyButton,
+  .cancelButton {
+    width: 100%;
+    text-align: center;
+  }
+
+  .toastNotification {
+    font-size: 0.95rem;
+    padding: 0.75rem 1rem;
+    margin-top: 1rem;
+  }
+
+  .conversationsList,
+  .newMessageBox {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+  }
+}
+
+ul {
+  padding: 0;
+  margin: 0;
+}
