@@ -1,9 +1,37 @@
-import { json, redirect } from "@remix-run/node";
+import { json, redirect, LoaderFunction, ActionFunction } from "@remix-run/node";
 import { useActionData } from "@remix-run/react";
 import Login from '../../../src/components/login/login';
 import { authCookie } from "../logout/route";
 
-export const action = async ({ request }: { request: Request }) => {
+export const loader: LoaderFunction = async ({ request }) => {
+    const cookieHeader = request.headers.get("cookie");
+    const token = await authCookie.parse(cookieHeader);
+
+    if (!token) return null;
+
+    const response = await fetch("http://127.0.0.1:8000/api/users/session/", {
+        method: "GET",
+        headers: {
+            Authorization: `Token ${token}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        const roleToPath: Record<string, string> = {
+            MASTER: "/master",
+            EMPRESA: "/company",
+            EMPLEADO: "/employee",
+        };
+
+        return redirect(roleToPath[data.role] || "/");
+    }
+
+    return null;
+};
+
+export const action: ActionFunction = async ({ request }) => {
     const formData = await request.formData();
     const username = formData.get("username");
     const password = formData.get("password");
@@ -27,8 +55,7 @@ export const action = async ({ request }: { request: Request }) => {
     });
 };
 
-export default function IndexPage() {
+export default function LoginPage() {
     const actionData = useActionData<{ error?: string }>();
-
     return <Login error={actionData?.error} />;
 }
