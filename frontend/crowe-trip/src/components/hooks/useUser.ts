@@ -31,7 +31,6 @@ export default function useUser() {
                     credentials: "include",
                     
                 });
-                console.log("hola mundo desde useUser.ts")
 
                 if (!response.ok) throw new Error("No se pudo obtener la información del usuario");
 

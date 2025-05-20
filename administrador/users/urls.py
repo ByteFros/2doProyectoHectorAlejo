@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .auth_views import LoginView, LogoutView, RegisterUserView
+from .auth_views import LoginView, LogoutView, RegisterUserView, SessionView
 from .dias_views import DiaViajeListView, DiaViajeUpdateView
 from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
     RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView, PendingCompaniesView, \
@@ -29,6 +29,7 @@ urlpatterns = [
     path("empleados/batch-upload/", BatchRegisterEmployeesView.as_view(), name="batch_register_employees"),
     path('login/', LoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
+    path('session/', SessionView.as_view(), name='session'),
 
     # Usuarios y empresas
     path('profile/', UserDetailView.as_view(), name='profile'),

@@ -12,6 +12,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer, EmpresaPendingSerializer
 from django.db import IntegrityError, transaction
+from django.utils.text import slugify
+import random
+import string
+
+
+def generate_unique_username(base_name):
+    """Genera un username único basado en el nombre y apellido"""
+    username = slugify(base_name.lower())  # ej. juan-perez
+    while CustomUser.objects.filter(username=username).exists():
+        suffix = ''.join(random.choices(string.digits, k=3))  # ej. juan-perez742
+        username = f"{slugify(base_name.lower())}{suffix}"
+    return username
 
 
 class RegisterEmpresaView(APIView):
@@ -58,6 +70,7 @@ class RegisterEmpresaView(APIView):
         except KeyError as e:
             return Response({"error": f"Falta el campo {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
+
 class EliminarEmpleadoView(APIView):
     """Permite a una EMPRESA eliminar a sus empleados"""
     authentication_classes = [TokenAuthentication]
@@ -76,6 +89,7 @@ class EliminarEmpleadoView(APIView):
         except EmpleadoProfile.DoesNotExist:
             return Response({"error": "Empleado no encontrado o no pertenece a tu empresa."},
                             status=status.HTTP_404_NOT_FOUND)
+
 
 class RegisterEmployeeView(APIView):
     authentication_classes = [TokenAuthentication]
@@ -96,17 +110,18 @@ class RegisterEmployeeView(APIView):
         apellido = data.get("apellido", "").strip()
         dni = data.get("dni", "").strip()
         email = data.get("email", "").strip()
-        password = data.get("password", "").strip()  # 🔹 Si no se proporciona, usa "empleado"
+        password = data.get("password", "").strip() or "empleado"
+        username = data.get("username", "").strip()
 
-        if not password:
-            password = "empleado"
-
+        # Validaciones mínimas
         if not nombre or not apellido or not dni:
             return Response({"error": "Nombre, Apellido y DNI son obligatorios"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if CustomUser.objects.filter(username=dni).exists():
-            return Response({"error": "El DNI ya está registrado"}, status=status.HTTP_400_BAD_REQUEST)
+        # Verificar que el DNI no esté repetido en perfiles
+        if EmpleadoProfile.objects.filter(dni=dni).exists():
+            return Response({"error": "El DNI ya está asociado a un empleado"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Generar email si no se proporciona
         if not email:
             nombre_empresa = empresa.nombre_empresa.lower().replace(" ", "")
             email = f"{nombre.lower()}.{apellido.lower()}@{nombre_empresa}.com"
@@ -114,15 +129,24 @@ class RegisterEmployeeView(APIView):
         if CustomUser.objects.filter(email=email).exists():
             return Response({"error": "El email ya está registrado"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 🔹 Crear usuario asegurando que la contraseña se encripta correctamente
+        # Validar username o generarlo automáticamente
+        if username:
+            if CustomUser.objects.filter(username=username).exists():
+                return Response({"error": "El nombre de usuario ya existe"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            base = f"{nombre}{apellido}"
+            username = generate_unique_username(base)
+
+        # Crear usuario
         user = CustomUser(
-            username=f"{nombre}{apellido}",
+            username=username,
             email=email,
             role="EMPLEADO"
         )
-        user.set_password(password)  # ✅ Encripta la contraseña correctamente
+        user.set_password(password)
         user.save()
 
+        # Crear perfil de empleado
         empleado = EmpleadoProfile.objects.create(
             user=user,
             empresa=empresa,
@@ -132,6 +156,7 @@ class RegisterEmployeeView(APIView):
         )
 
         return Response(EmpleadoProfileSerializer(empleado).data, status=status.HTTP_201_CREATED)
+
 
 class BatchRegisterEmployeesView(APIView):
     """Permite a una empresa registrar empleados en lote desde un archivo CSV"""
@@ -302,12 +327,14 @@ class PendingCompaniesView(APIView):
             except EmpresaProfile.DoesNotExist:
                 return Response({'error': 'No tienes perfil de empresa'}, status=status.HTTP_403_FORBIDDEN)
             if not mi_empresa.permisos:
-                return Response({'error': 'No tienes permisos para gestionar revisiones'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'No tienes permisos para gestionar revisiones'},
+                                status=status.HTTP_403_FORBIDDEN)
             qs = qs.filter(id=mi_empresa.id)
 
         # MASTER ve QS completo
         data = EmpresaPendingSerializer(qs, many=True).data
         return Response(data, status=status.HTTP_200_OK)
+
 
 class PendingEmployeesByCompanyView(APIView):
     """

@@ -75,3 +75,34 @@ class RegisterUserView(APIView):
             user = serializer.save()
             return Response(user, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SessionView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        token = request.auth  # Este es el token enviado por el cliente
+
+        resp = {
+            "username": user.username,
+            "role": user.role,
+            "token": token.key if token else None,
+            "must_change_password": user.must_change_password,
+            "user_id": user.id,
+        }
+
+        if user.role == "EMPRESA":
+            try:
+                resp["empresa_id"] = user.empresa_profile.id
+            except EmpresaProfile.DoesNotExist:
+                resp["empresa_id"] = None
+
+        if user.role == "EMPLEADO":
+            try:
+                resp["empleado_id"] = user.empleado_profile.id
+            except EmpleadoProfile.DoesNotExist:
+                resp["empleado_id"] = None
+
+        return Response(resp)

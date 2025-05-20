@@ -66,13 +66,7 @@ export default function ManageEmployeesPage() {
                     <EmployeeTable  />
                 )}
 
-                {activeTab === 'trips' && (
-                    <TripManager
-                        company={{ id: 1, nombre: 'Empresa Prueba' }}
-                        employees={employees}
-                        trips={employees.flatMap((e) => e.trips)}
-                    />
-                )}
+
             </div>
         </div>
     );

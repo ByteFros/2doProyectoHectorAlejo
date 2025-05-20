@@ -54,6 +54,7 @@ export default function EmployeeTable() {
         <thead>
           <tr>
             <th className={styles.employeeTableHeader}>Nombre</th>
+            <th className={styles.employeeTableHeader}>Usuario</th>
             <th className={styles.employeeTableHeader}>DNI</th>
             <th className={styles.employeeTableHeader}>Email</th>
             <th className={styles.employeeTableHeader}>Acciones</th>
@@ -66,6 +67,7 @@ export default function EmployeeTable() {
               className={emp.id === localDeletedId ? styles.fadeOutRow : ""}
             >
               <td className={styles.employeeTableCell}>{emp.nombre} {emp.apellido}</td>
+              <td className={styles.employeeTableCell}>{emp.username}</td>
               <td className={styles.employeeTableCell}>{emp.dni}</td>
               <td className={styles.employeeTableCell}>{emp.email}</td>
               <td className={styles.employeeTableCell}>
