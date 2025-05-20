@@ -9,6 +9,7 @@ export interface Employee {
   email: string;
   dni: string;
   empresa: string;
+  username: string;
 }
 
 export default function useEmployees(empresaId: number | null, role?: "MASTER" | "EMPRESA" | "EMPLEADO" | null) {
