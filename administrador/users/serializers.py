@@ -23,10 +23,11 @@ class EmpleadoProfileSerializer(serializers.ModelSerializer):
     empresa = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
     email = serializers.StringRelatedField(source="user.email", read_only=True)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.StringRelatedField(source="user.username", read_only=True)  # 🆕 Añadido
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username']
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
