@@ -148,7 +148,9 @@ export default function Layout({ children, onSectionChange }: LayoutProps) {
                             className={`user-button ${isSettingsOpen ? 'open' : ''}`}
                         >
                             <div>
-                                <p className="username">{user.username}</p>
+                                <p className="username">
+                                    {user.nombre} {user.apellido}
+                                </p>
                                 <p className="user-role">
                                     {user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()}
                                 </p>
