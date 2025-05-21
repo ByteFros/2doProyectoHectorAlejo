@@ -24,16 +24,27 @@ class UserDetailView(APIView):
         """Obtener datos del usuario autenticado."""
         user = request.user
         empresa_id = None
+        nombre = None
+        apellido = None
 
         if user.role == "EMPRESA":
             empresa_profile = EmpresaProfile.objects.filter(user=user).first()
             empresa_id = empresa_profile.id if empresa_profile else None
 
+        elif user.role == "EMPLEADO":
+            empleado_profile = EmpleadoProfile.objects.filter(user=user).first()
+            if empleado_profile:
+                empresa_id = empleado_profile.empresa.id
+                nombre = empleado_profile.nombre
+                apellido = empleado_profile.apellido
+
         return Response({
             "username": user.username,
             "role": user.role,
             "empresa_id": empresa_id,
-            "must_change_password": user.must_change_password
+            "must_change_password": user.must_change_password,
+            "nombre": nombre,
+            "apellido": apellido
         })
 
     def put(self, request):
