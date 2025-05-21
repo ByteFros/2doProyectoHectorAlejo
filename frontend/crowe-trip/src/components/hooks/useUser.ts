@@ -5,6 +5,8 @@ interface User {
     role: "MASTER" | "EMPRESA" | "EMPLEADO";
     empresa_id?: number;
     must_change_password?: boolean;
+    nombre?: string;
+    apellido?: string;
 }
 
 export default function useUser() {

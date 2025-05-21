@@ -8,6 +8,7 @@ import logo from '~/assets/img/crowe-trip-logo/crowe-trip.png';
 import Messages from '../messages/messages';
 import { FaSignOutAlt, FaKey, FaClock, FaCalendarAlt, FaCog } from 'react-icons/fa';
 import ChangePasswordModal from '../change-password/change-password';
+import ForceChangePassword from '../force-change-password/force-change-password';
 
 interface LayoutProps {
     children: ReactNode;
@@ -147,7 +148,9 @@ export default function Layout({ children, onSectionChange }: LayoutProps) {
                             className={`user-button ${isSettingsOpen ? 'open' : ''}`}
                         >
                             <div>
-                                <p className="username">{user.username}</p>
+                                <p className="username">
+                                    {user.nombre} {user.apellido}
+                                </p>
                                 <p className="user-role">
                                     {user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()}
                                 </p>
@@ -180,10 +183,16 @@ export default function Layout({ children, onSectionChange }: LayoutProps) {
                 </main>
             </div>
 
-            <ChangePasswordModal
-                isOpen={isPasswordModalOpen}
-                onClose={() => setIsPasswordModalOpen(false)}
-            />
+            {isPasswordModalOpen && (
+                <ForceChangePassword
+                    onPasswordChange={() => {
+                        // If you have a way to update the user context, do it here.
+                        // For now, just close the modal.
+                        setIsPasswordModalOpen(false);
+                    }}
+                />
+            )}
+
         </div>
     );
 }
