@@ -149,7 +149,9 @@ export default function Layout({ children, onSectionChange }: LayoutProps) {
                         >
                             <div>
                                 <p className="username">
-                                    {user.nombre} {user.apellido}
+                                    {user.role === 'EMPLEADO'
+                                        ? `${user.nombre} ${user.apellido}`
+                                        : user.username}
                                 </p>
                                 <p className="user-role">
                                     {user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase()}
@@ -175,6 +177,7 @@ export default function Layout({ children, onSectionChange }: LayoutProps) {
                             </div>
                         )}
                     </div>
+
                 </aside>
 
                 {/* ✅ Usamos workspace directamente */}
