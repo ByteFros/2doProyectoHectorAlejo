@@ -15,6 +15,7 @@ const capitalizeFullName = (fullName: string) =>
 
 export default function ForceChangePassword({ onPasswordChange }: ForceChangePasswordProps) {
     const { username, changePassword } = useAuth();
+
     const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,6 +23,29 @@ export default function ForceChangePassword({ onPasswordChange }: ForceChangePas
     const [passwordError, setPasswordError] = useState("");
     const [confirmError, setConfirmError] = useState("");
     const [passwordStrength, setPasswordStrength] = useState<"débil" | "media" | "segura" | "">("");
+
+    const displayName = username ? capitalizeFullName(username) : "usuario";
+
+    const handleNewPasswordChange = (value: string) => {
+        setNewPassword(value);
+
+        const hasUpper = /[A-Z]/.test(value);
+        const hasLower = /[a-z]/.test(value);
+        const hasNumber = /\d/.test(value);
+        const hasSymbol = /[^a-zA-Z0-9]/.test(value);
+
+        const passed = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length;
+
+        if (value.length >= 12 && passed >= 3) {
+            setPasswordStrength("segura");
+        } else if (value.length >= 8 && passed >= 2) {
+            setPasswordStrength("media");
+        } else if (value.length > 0) {
+            setPasswordStrength("débil");
+        } else {
+            setPasswordStrength("");
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,14 +60,14 @@ export default function ForceChangePassword({ onPasswordChange }: ForceChangePas
 
         if (errors.length > 0) {
             setPasswordError(
-                `Hola ${capitalizeFullName(safeUsername)}, tu contraseña debe contener ${errors.join(", ")}.`
+                `Hola ${displayName}, tu contraseña debe contener ${errors.join(", ")}.`
             );
         } else {
             setPasswordError("");
         }
 
         if (newPassword !== confirmPassword) {
-            setConfirmError(`Hola ${capitalizeFullName(safeUsername)}, las contraseñas no coinciden.`);
+            setConfirmError(`Hola ${displayName}, las contraseñas no coinciden.`);
         } else {
             setConfirmError("");
         }
@@ -67,7 +91,7 @@ export default function ForceChangePassword({ onPasswordChange }: ForceChangePas
 
                 <h2 className={styles.forceChangePasswordTitle}>Cambio de contraseña obligatorio</h2>
                 <p className={styles.forceChangePasswordMessage}>
-                    Hola <strong>{capitalizeFullName(safeUsername)}</strong>, debes cambiar tu contraseña antes de usar tu perfil.
+                    Hola <strong>{displayName}</strong>, debes cambiar tu contraseña antes de usar tu perfil.
                 </p>
 
                 <form onSubmit={handleSubmit}>
@@ -85,7 +109,7 @@ export default function ForceChangePassword({ onPasswordChange }: ForceChangePas
                         className={styles.forceChangePasswordInput}
                         type={showPassword ? "text" : "password"}
                         value={newPassword}
-                        onChange={(e) => handlePasswordChange(e.target.value)}
+                        onChange={(e) => handleNewPasswordChange(e.target.value)}
                         required
                     />
                     {passwordStrength && (
