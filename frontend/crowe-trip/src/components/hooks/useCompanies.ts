@@ -1,7 +1,7 @@
 // hooks/useCompanies.ts
 import { useState, useEffect, useCallback } from 'react';
 import useAuth from './use-auth';
-import { apiRequest } from '@config/api';
+import { apiRequest } from '../../config/api';
 
 export interface Empresa {
   id: number;

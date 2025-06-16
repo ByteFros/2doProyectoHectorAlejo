@@ -24,7 +24,7 @@ export default function useConversationMessages(conversationId: number | null) {
   useEffect(() => {
     if (!token || conversationId == null) return;
     setLoading(true);
-    fetch(buildApiUrl(`/conversaciones/${conversationId}/mensajes/`), {
+    fetch(buildApiUrl(`/users/conversaciones/${conversationId}/mensajes/`), {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {
@@ -55,7 +55,7 @@ export default function useConversationMessages(conversationId: number | null) {
       if (gastoId != null) form.append('gasto_id', String(gastoId));
       if (archivo)    form.append('archivo', archivo);
 
-      const res = await fetch(buildApiUrl('/mensajes/enviar/'), {
+      const res = await fetch(buildApiUrl('/users/mensajes/enviar/'), {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

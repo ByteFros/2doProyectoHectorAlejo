@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Message, MessageActions } from './types';
 import useAuth from './use-auth';
-import { buildApiUrl } from '@config/api';
+import { buildApiUrl } from '~/config/api';
 
 export function useEmployeeMessages(): MessageActions {
   const { token } = useAuth();
@@ -14,7 +14,7 @@ export function useEmployeeMessages(): MessageActions {
     setLoading(true);
 
     try {
-      const response = await fetch(buildApiUrl('/mensajes/'), {
+      const response = await fetch(buildApiUrl('/users/mensajes/'), {
         headers: {
           Authorization: `Token ${token}`,
         },
@@ -27,7 +27,7 @@ export function useEmployeeMessages(): MessageActions {
         content: msg.motivo,
         timestamp: msg.fecha_creacion,
         reply: msg.respuesta || undefined,
-        attachmentUrl: buildApiUrl(`/gastos/${msg.gasto_id}/file/`),
+        attachmentUrl: buildApiUrl(`/users/gastos/${msg.gasto_id}/file/`),
         status: msg.estado,
         read: true,
       })) as Message[];
@@ -50,7 +50,7 @@ export function useEmployeeMessages(): MessageActions {
     if (file) formData.append('archivo', file);
 
     try {
-      await fetch(buildApiUrl(`/mensajes/${replyToId}/responder/`), {
+      await fetch(buildApiUrl(`/users/mensajes/${replyToId}/responder/`), {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

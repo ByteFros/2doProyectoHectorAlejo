@@ -1,7 +1,7 @@
 // hooks/useEmployeeCityStats.ts
 import { useEffect, useState } from "react";
 import useAuth from "./use-auth";
-import { apiRequest } from '@config/api';
+import { apiRequest } from '../../config/api';
 
 interface CityStats {
   city: string;

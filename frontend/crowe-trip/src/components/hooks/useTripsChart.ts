@@ -1,7 +1,7 @@
 // hooks/useTripsChart.ts
 import { useState, useEffect } from "react";
 import useAuth from "./use-auth";
-import { apiRequest } from '@config/api';
+import { apiRequest } from '../../config/api';
 
 export default function useTripsChart() {
   const { token } = useAuth();

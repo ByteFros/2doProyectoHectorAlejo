@@ -281,17 +281,31 @@ class DescargarAdjuntoMensajeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, mensaje_id):
+        print(f"🔧 [DescargarAdjuntoMensajeView] Request received for mensaje_id: {mensaje_id}")
+        print(f"🔧 [DescargarAdjuntoMensajeView] User: {request.user}")
+        print(f"🔧 [DescargarAdjuntoMensajeView] Path: {request.path}")
+        
         mensaje = get_object_or_404(Mensaje, id=mensaje_id)
+        print(f"🔧 [DescargarAdjuntoMensajeView] Mensaje found: {mensaje}")
+        print(f"🔧 [DescargarAdjuntoMensajeView] Mensaje.archivo: {mensaje.archivo}")
+        
         # Validar que el usuario participe en la conversación:
         if request.user not in mensaje.conversacion.participantes.all():
+            print(f"🔧 [DescargarAdjuntoMensajeView] User not authorized")
             return Response({"error": "No autorizado"}, status=403)
 
         if not mensaje.archivo:
+            print(f"🔧 [DescargarAdjuntoMensajeView] No archivo found")
             return Response({"error": "No hay archivo adjunto"}, status=404)
 
         archivo = mensaje.archivo
+        print(f"🔧 [DescargarAdjuntoMensajeView] Archivo path: {archivo.path}")
+        print(f"🔧 [DescargarAdjuntoMensajeView] Archivo name: {archivo.name}")
+        
         mime_type, _ = mimetypes.guess_type(archivo.name)
         response = FileResponse(archivo.open(), content_type=mime_type or 'application/octet-stream')
         filename = os.path.basename(archivo.name)
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        print(f"🔧 [DescargarAdjuntoMensajeView] Returning file response")
         return response

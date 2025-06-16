@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Message, MessageActions } from './types';
 import useAuth from './use-auth';
-import { buildApiUrl } from '@config/api';
+import { buildApiUrl } from '../../config/api';
 
 export function useMasterMessages(): MessageActions {
     const { token } = useAuth();
@@ -14,7 +14,7 @@ export function useMasterMessages(): MessageActions {
         setLoading(true);
 
         try {
-            const response = await fetch(buildApiUrl('/mensajes/'), {
+            const response = await fetch(buildApiUrl('/users/mensajes/'), {
                 headers: {
                     Authorization: `Token ${token}`,
                 },
@@ -27,7 +27,7 @@ export function useMasterMessages(): MessageActions {
                 content: msg.motivo,
                 timestamp: msg.fecha_creacion,
                 reply: msg.respuesta || undefined,
-                attachmentUrl: buildApiUrl(`/gastos/${msg.gasto_id}/file/`),
+                attachmentUrl: buildApiUrl(`/users/gastos/${msg.gasto_id}/file/`),
                 status: msg.estado,
                 read: true,
             })) as Message[];
@@ -46,7 +46,7 @@ export function useMasterMessages(): MessageActions {
 
     const approveJustification = async (id: number) => {
         try {
-            await fetch(buildApiUrl(`/mensajes/${id}/cambiar-estado/`), {
+            await fetch(buildApiUrl(`/users/mensajes/${id}/cambiar-estado/`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Token ${token}`,
@@ -61,7 +61,7 @@ export function useMasterMessages(): MessageActions {
 
     const rejectJustification = async (id: number) => {
         try {
-            await fetch(buildApiUrl(`/mensajes/${id}/cambiar-estado/`), {
+            await fetch(buildApiUrl(`/users/mensajes/${id}/cambiar-estado/`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Token ${token}`,
@@ -80,7 +80,7 @@ export function useMasterMessages(): MessageActions {
         if (file) formData.append('archivo', file);
 
         try {
-            await fetch(buildApiUrl(`/mensajes/${replyToId}/responder/`), {
+            await fetch(buildApiUrl(`/users/mensajes/${replyToId}/responder/`), {
                 method: 'POST',
                 headers: {
                     Authorization: `Token ${token}`,

@@ -56,14 +56,19 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
 }
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',  # Deshabilitado para API
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -154,21 +159,53 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # aqui se declara el modelo de usuario que creamos en models.py
 AUTH_USER_MODEL = 'users.CustomUser'
 
+# CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "http://localhost:8000",
+    "http://localhost:8000", 
     "http://127.0.0.1:5173",
-    "http://crowe:5173",              # Nombre del servicio en Docker
-    "http://212.227.57.91:5173",      # IP pública
+    "http://127.0.0.1:8000",
+    "http://crowe_frontend:5173",     # Nombre del servicio en Docker
+    "http://crowe_backend:8000",     # Nombre del servicio en Docker
 ]
 
-CORS_ALLOW_CREDENTIALS = True  # ✅ Permitir envío de cookies
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False  # Usar solo en desarrollo
 
-CSRF_COOKIE_SAMESITE = "None"
-SESSION_COOKIE_SAMESITE = "None"  # ✅ Permitir cookies cross-site
+# Headers permitidos para CORS
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding', 
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = False  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
+# Métodos permitidos
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH', 
+    'POST',
+    'PUT',
+]
+
+# CSRF Configuration (deshabilitado para API)
+CSRF_COOKIE_SECURE = False  # Solo HTTPS en producción
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# Session Configuration
+SESSION_COOKIE_SECURE = False  # Solo HTTPS en producción
+SESSION_COOKIE_SAMESITE = 'Lax'  # Cambiado de None a Lax
+CSRF_COOKIE_SAMESITE = 'Lax'     # Cambiado de None a Lax
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

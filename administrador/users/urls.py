@@ -25,6 +25,7 @@ urlpatterns = [
     # Autenticación
     path('register/', RegisterUserView.as_view(), name='register'),
     path('empresas/new/', RegisterEmpresaView.as_view(), name='crear_empresa'),
+    path('empresas/test-json/', RegisterEmpresaView.as_view(), name='crear_empresa_test'),  # Test URL
     path('empleados/nuevo/', RegisterEmployeeView.as_view(), name='registrar_empleado'),
     path("empleados/batch-upload/", BatchRegisterEmployeesView.as_view(), name="batch_register_employees"),
     path('login/', LoginView.as_view(), name='login'),

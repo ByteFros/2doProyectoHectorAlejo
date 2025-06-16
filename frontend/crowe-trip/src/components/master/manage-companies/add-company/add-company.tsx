@@ -3,7 +3,7 @@ import { useState } from "react";
 import styles from "./add-company.module.scss";
 import { FaBuilding, FaIdCard, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
 import useAuth from "~/components/hooks/use-auth";
-import { apiRequest } from '@config/api';
+import { apiRequest, apiRequestDebug } from "~/config/api";
 
 export type Empresa = {
     id: number;
@@ -45,21 +45,30 @@ export default function AddCompany({ onAddCompany }: Props) {
     e.preventDefault();
     setError(null);
 
+    const requestData = {
+      nombre_empresa: form.nombre,
+      nif: form.nif,
+      address: form.domicilio,
+      city: "",
+      postal_code: "",
+      correo_contacto: form.correo,
+      permisos: form.autogestion,
+    };
+
+    // Debug temporal
+    console.log('🔧 [AddCompany] Request data:', requestData);
+    console.log('🔧 [AddCompany] Token:', token);
+    console.log('🔧 [AddCompany] JSON stringify:', JSON.stringify(requestData));
+
     try {
+      console.log('🔧 [AddCompany] Using fixed apiRequest...');
+      
       const res = await apiRequest("/users/empresas/new/", {
         method: "POST",
         headers: {
           Authorization: `Token ${token}`,
         },
-        body: JSON.stringify({
-          nombre_empresa: form.nombre,
-          nif: form.nif,
-          address: form.domicilio,
-          city: "",
-          postal_code: "",
-          correo_contacto: form.correo,
-          permisos: form.autogestion,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!res.ok) {

@@ -20,7 +20,7 @@ export default function useConversations() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    apiRequest('/conversaciones/', {
+    apiRequest('/users/conversaciones/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {
@@ -36,7 +36,7 @@ export default function useConversations() {
   const createConversation = useCallback(
     async (userId: number) => {
       if (!token) throw new Error('No autorizado');
-      const res = await apiRequest('/conversaciones/crear/', {
+      const res = await apiRequest('/users/conversaciones/crear/', {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

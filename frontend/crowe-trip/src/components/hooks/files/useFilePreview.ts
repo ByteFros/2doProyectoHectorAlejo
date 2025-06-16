@@ -26,11 +26,11 @@ export interface PreviewFile {
 function buildFileUrl(category: FileCategory, id: number): string {
   switch (category) {
     case 'mensaje':
-      return buildApiUrl(`/mensajes/${id}/file/`);
+      return buildApiUrl(`/users/mensajes/${id}/file/`);
     case 'justificante':
-      return buildApiUrl(`/mensajes/justificante/${id}/file/`);
+      return buildApiUrl(`/users/mensajes/justificante/${id}/file/`);
     case 'gasto':
-      return buildApiUrl(`/gastos/${id}/file/`);
+      return buildApiUrl(`/users/gastos/${id}/file/`);
     default:
       throw new Error(`Unknown file category: ${category}`);
   }
@@ -66,11 +66,23 @@ export default function useFilePreview() {
       setIsLoading(true);
       try {
         const url = buildFileUrl(category, id);
+        console.log('🔧 [useFilePreview] Opening file preview:');
+        console.log('🔧 [useFilePreview] ID:', id);
+        console.log('🔧 [useFilePreview] Category:', category);
+        console.log('🔧 [useFilePreview] Built URL:', url);
+        
         const response = await fetch(url, {
           method: 'GET',
           headers: { Authorization: `Token ${token}` },
         });
-        if (!response.ok) throw new Error('Archivo no encontrado');
+        
+        console.log('🔧 [useFilePreview] Response status:', response.status);
+        console.log('🔧 [useFilePreview] Response headers:', [...response.headers.entries()]);
+        
+        if (!response.ok) {
+          console.error('🔧 [useFilePreview] Response not OK, throwing error');
+          throw new Error('Archivo no encontrado');
+        }
 
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);

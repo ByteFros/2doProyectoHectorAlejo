@@ -3,7 +3,7 @@ import io
 
 from django.shortcuts import get_object_or_404
 from rest_framework.authentication import TokenAuthentication
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from .models import EmpleadoProfile, EmpresaProfile, CustomUser
 from rest_framework import status
@@ -29,8 +29,25 @@ def generate_unique_username(base_name):
 class RegisterEmpresaView(APIView):
     """Endpoint para registrar una nueva empresa con un usuario asociado"""
     permission_classes = [IsAuthenticated]  # Solo usuarios autenticados pueden crear empresas
+    
+    # Forzar parsers explícitamente para debug
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    def dispatch(self, request, *args, **kwargs):
+        print(f"🔧 [RegisterEmpresaView] DISPATCH - Method: {request.method}")
+        print(f"🔧 [RegisterEmpresaView] DISPATCH - Path: {request.path}")
+        print(f"🔧 [RegisterEmpresaView] DISPATCH - Content-Type: {getattr(request, 'content_type', 'None')}")
+        print(f"🔧 [RegisterEmpresaView] DISPATCH - Available parsers: {[p.__name__ for p in self.parser_classes]}")
+        return super().dispatch(request, *args, **kwargs)
 
     def post(self, request):
+        print(f"🔧 [RegisterEmpresaView] POST METHOD REACHED!")
+        print(f"🔧 [RegisterEmpresaView] Request received!")
+        print(f"🔧 [RegisterEmpresaView] Content-Type: {request.content_type}")
+        print(f"🔧 [RegisterEmpresaView] Request method: {request.method}")
+        print(f"🔧 [RegisterEmpresaView] Headers: {dict(request.headers)}")
+        print(f"🔧 [RegisterEmpresaView] Raw body: {request.body}")
+        print(f"🔧 [RegisterEmpresaView] request.data: {request.data}")
         data = request.data  # 🔹 Recibe los datos del formulario
 
         try:

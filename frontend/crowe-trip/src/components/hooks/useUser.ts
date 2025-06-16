@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiRequest } from "@config/api";
+import { apiRequest } from "../../config/api";
 
 interface User {
     username: string;

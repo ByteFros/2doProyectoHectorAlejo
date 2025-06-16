@@ -33,7 +33,7 @@ const ExpenseSelector: React.FC<ExpenseSelectorProps> = ({ onSelectExpense, sele
       setError(null);
       
       try {
-        const response = await apiRequest('/gastos/pendientes/', {
+        const response = await apiRequest('/users/gastos/pendientes/', {
           headers: {
             'Authorization': `Token ${token}`,
           },
