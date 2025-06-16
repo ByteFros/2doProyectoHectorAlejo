@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import useAuth from "../use-auth";
+import { apiRequest } from '@config/api';
 
 interface ChartData {
     labels: string[];
@@ -21,10 +22,9 @@ export default function useCompanyTripsChart() {
 
         const fetchData = async () => {
             try {
-                const res = await fetch("http://127.0.0.1:8000/api/users/report/trips-per-month/", {
+                const res = await apiRequest("/users/report/trips-per-month/", {
                     headers: {
                         Authorization: `Token ${token}`,
-                        "Content-Type": "application/json",
                     },
                 });
 

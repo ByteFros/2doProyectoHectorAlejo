@@ -1,6 +1,7 @@
 // hooks/useRegisterEmployees.ts
 import { useState } from 'react';
 import useAuth from '../use-auth';
+import { apiRequest, buildApiUrl } from '@config/api';
 
 interface EmployeePayload {
   nombre: string;
@@ -25,11 +26,10 @@ export default function useRegisterEmployees() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empleados/nuevo/', {
+      const res = await apiRequest('/users/empleados/nuevo/', {
         method: 'POST',
         headers: {
           'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
       });
@@ -55,7 +55,8 @@ export default function useRegisterEmployees() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empleados/batch-upload/', {
+      // Para FormData, usar fetch con buildApiUrl
+      const res = await fetch(buildApiUrl('/users/empleados/batch-upload/'), {
         method: 'POST',
         headers: {
           'Authorization': `Token ${token}`,

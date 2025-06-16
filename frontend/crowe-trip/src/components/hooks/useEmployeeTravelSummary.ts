@@ -1,6 +1,7 @@
 // hooks/useEmployeeTravelSummary.ts
 import { useEffect, useState } from "react";
 import useAuth from "./use-auth";
+import { apiRequest } from '@config/api';
 
 interface TravelSummary {
     national: number;
@@ -19,10 +20,9 @@ export default function useEmployeeTravelSummary() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/report/trips-type/", {
+        const res = await apiRequest("/users/report/trips-type/", {
           headers: {
             Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
           },
         });
 

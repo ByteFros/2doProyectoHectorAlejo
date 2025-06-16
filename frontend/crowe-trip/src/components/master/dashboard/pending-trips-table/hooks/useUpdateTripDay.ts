@@ -1,6 +1,7 @@
 // hooks/useUpdateTripDay.ts
 import { useState } from 'react'
 import useAuth from '~/components/hooks/use-auth'
+import { buildApiUrl } from '@config/api'
 
 export default function useUpdateTripDay() {
   const { token } = useAuth()
@@ -13,7 +14,7 @@ export default function useUpdateTripDay() {
     setError(null)
 
     return fetch(
-      `http://127.0.0.1:8000/api/users/viajes/${tripId}/dias/${dayId}/`,
+      buildApiUrl(`/users/viajes/${tripId}/dias/${dayId}/`),
       {
         method: 'PUT',
         headers: {

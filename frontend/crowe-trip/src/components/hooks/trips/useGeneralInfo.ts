@@ -1,6 +1,7 @@
 // hooks/useGeneralInfo.ts
 import { useState, useEffect } from 'react';
 import useAuth from '../use-auth';
+import { apiRequest } from '@config/api';
 
 interface GeneralInfo {
   companies: number;
@@ -21,7 +22,7 @@ export default function useGeneralInfo() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/users/report/general-info/', {
+    apiRequest('/users/report/general-info/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => res.json())

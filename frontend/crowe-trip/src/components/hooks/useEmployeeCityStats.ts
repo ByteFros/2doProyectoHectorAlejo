@@ -1,6 +1,7 @@
 // hooks/useEmployeeCityStats.ts
 import { useEffect, useState } from "react";
 import useAuth from "./use-auth";
+import { apiRequest } from '@config/api';
 
 interface CityStats {
   city: string;
@@ -21,10 +22,9 @@ export default function useEmployeeCityStats() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/empleados/ciudades/", {
+        const res = await apiRequest("/users/empleados/ciudades/", {
           headers: {
             Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
           },
         });
 

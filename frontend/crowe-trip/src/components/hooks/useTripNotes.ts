@@ -1,6 +1,7 @@
 // hooks/useTripNotes.ts
 import { useState, useEffect } from "react";
 import useAuth from "./use-auth";
+import { apiRequest } from "../../config/api";
 
 export interface Nota {
     id: number;
@@ -20,7 +21,7 @@ export function useTripNotes(tripId: number | null) {
 
         console.log("📥 Cargando notas para el viaje:", tripId);
 
-        fetch(`http://127.0.0.1:8000/api/users/notas/${tripId}/`, {
+        apiRequest(`/users/notas/${tripId}/`, {
             headers: {
                 Authorization: `Token ${token}`,
             },
@@ -45,10 +46,9 @@ export function useTripNotes(tripId: number | null) {
         }
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/users/notas/${tripId}/`, {
+            const res = await apiRequest(`/users/notas/${tripId}/`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Token ${token}`,
                 },
                 body: JSON.stringify({ contenido: texto }),
@@ -71,7 +71,7 @@ export function useTripNotes(tripId: number | null) {
         if (!token || !tripId) return;
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/users/notas/${tripId}/${noteId}/`, {
+            const res = await apiRequest(`/users/notas/${tripId}/${noteId}/`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Token ${token}`,

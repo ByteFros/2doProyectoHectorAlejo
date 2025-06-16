@@ -1,6 +1,7 @@
 // hooks/useTripDays.ts
 import { useState, useEffect } from 'react'
 import useAuth from '~/components/hooks/use-auth'
+import { apiRequest } from '@config/api'
 
 export interface TripDay {
   id: number
@@ -18,8 +19,8 @@ export default function useTripDays(tripId?: number) {
     if (!token || !tripId) return
     setLoading(true)
 
-    fetch(`http://127.0.0.1:8000/api/users/viajes/${tripId}/dias/`, {
-      headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
+    apiRequest(`/users/viajes/${tripId}/dias/`, {
+      headers: { Authorization: `Token ${token}` },
     })
     .then(r => {
       if (!r.ok) throw new Error('No pude cargar los días')

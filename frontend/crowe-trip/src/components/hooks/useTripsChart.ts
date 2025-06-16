@@ -1,6 +1,7 @@
 // hooks/useTripsChart.ts
 import { useState, useEffect } from "react";
 import useAuth from "./use-auth";
+import { apiRequest } from '@config/api';
 
 export default function useTripsChart() {
   const { token } = useAuth();
@@ -12,10 +13,9 @@ export default function useTripsChart() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/viajes/over/", {
+        const res = await apiRequest("/users/viajes/over/", {
           headers: {
             Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
           },
         });
 

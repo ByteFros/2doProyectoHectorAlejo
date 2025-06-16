@@ -1,6 +1,7 @@
-2// hooks/useCompanyTripsSummary.ts
+// hooks/useCompanyTripsSummary.ts
 import { useState, useEffect } from "react";
 import useAuth from "../use-auth";
+import { apiRequest } from '@config/api';
 
 interface CompanySummary {
   empresa_id: number;
@@ -17,7 +18,7 @@ export default function useCompanyTripsSummary() {
 
   useEffect(() => {
     if (!token) return;
-    fetch("http://127.0.0.1:8000/api/users/report/viajes/", {
+    apiRequest("/users/report/viajes/", {
       headers: {
         Authorization: `Token ${token}`,
       },

@@ -1,5 +1,6 @@
 // hooks/useCSVExport.ts
 import useAuth from "~/components/hooks/use-auth";
+import { buildApiUrl } from "../../../../../config/api";
 
 export default function useCSVExport() {
   const { token, role } = useAuth();
@@ -11,8 +12,8 @@ export default function useCSVExport() {
     }
 
     const endpoint = role === 'MASTER'
-      ? 'http://127.0.0.1:8000/api/users/export/viajes/exportar/'
-      : 'http://127.0.0.1:8000/api/users/export/empresa/viajes/exportar/';
+      ? buildApiUrl('/users/export/viajes/exportar/')
+      : buildApiUrl('/users/export/empresa/viajes/exportar/');
 
     const filename = role === 'MASTER'
       ? 'viajes_todas_empresas.csv'
@@ -23,6 +24,7 @@ export default function useCSVExport() {
         headers: {
           Authorization: `Token ${token}`,
         },
+        credentials: 'include',
       });
 
       if (!res.ok) {

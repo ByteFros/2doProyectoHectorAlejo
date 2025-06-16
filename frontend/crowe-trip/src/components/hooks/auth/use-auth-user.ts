@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "@remix-run/react";
+import { apiRequest } from "../../config/api";
 
 export type UserRole = "MASTER" | "EMPRESA" | "EMPLEADO" | null;
 
@@ -28,13 +29,11 @@ export default function useAuthUser() {
 
         const fetchUser = async () => {
             try {
-                const response = await fetch("http://127.0.0.1:8000/api/users/session/", {
+                const response = await apiRequest("/users/session/", {
                     method: "GET",
                     headers: {
                         Authorization: `Token ${token}`,
-                        "Content-Type": "application/json",
                     },
-                    credentials: "include",
                 });
 
                 if (!response.ok) {
@@ -70,11 +69,9 @@ export default function useAuthUser() {
 
     const login = async (username: string, password: string) => {
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/users/login/", {
+            const response = await apiRequest("/users/login/", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
-                credentials: "include",
             });
 
             if (!response.ok) return false;
@@ -109,13 +106,11 @@ export default function useAuthUser() {
 
     const logout = async () => {
         try {
-            await fetch("http://127.0.0.1:8000/api/users/logout/", {
+            await apiRequest("/users/logout/", {
                 method: "POST",
                 headers: {
                     Authorization: `Token ${user?.token}`,
-                    "Content-Type": "application/json",
                 },
-                credentials: "include",
             });
         } catch (err) {
             console.error("❌ Error al cerrar sesión:", err);
@@ -131,10 +126,9 @@ export default function useAuthUser() {
         if (!user?.token) return { success: false, error: "No hay token." };
 
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/users/change-password/", {
+            const response = await apiRequest("/users/change-password/", {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Token ${user.token}`,
                 },
                 body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),

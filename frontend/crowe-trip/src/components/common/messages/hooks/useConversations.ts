@@ -1,8 +1,7 @@
 // hooks/useConversations.ts
 import { useState, useEffect, useCallback } from 'react';
 import useAuth from '~/components/hooks/use-auth';
-
-const API_BASE = 'http://127.0.0.1:8000/api/users';
+import { apiRequest } from '@config/api';
 
 export interface Conversacion {
   id: number;
@@ -21,7 +20,7 @@ export default function useConversations() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetch(`${API_BASE}/conversaciones/`, {
+    apiRequest('/conversaciones/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {
@@ -37,10 +36,9 @@ export default function useConversations() {
   const createConversation = useCallback(
     async (userId: number) => {
       if (!token) throw new Error('No autorizado');
-      const res = await fetch(`${API_BASE}/conversaciones/crear/`, {
+      const res = await apiRequest('/conversaciones/crear/', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Token ${token}`,
         },
         body: JSON.stringify({ empleado_id: userId }),

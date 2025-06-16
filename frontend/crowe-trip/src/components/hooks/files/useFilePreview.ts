@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import useAuth from '../use-auth';
+import { buildApiUrl } from '@config/api';
 
 // Define the allowed file categories/endpoints
 export type FileCategory = 'mensaje' | 'justificante' | 'gasto';
@@ -19,17 +20,17 @@ export interface PreviewFile {
   expenseInfo?: ExpenseInfo;
 }
 
-const API_BASE = 'http://127.0.0.1:8000/api/users';
+
 
 // Helper: build the correct URL according to category and ID
 function buildFileUrl(category: FileCategory, id: number): string {
   switch (category) {
     case 'mensaje':
-      return `${API_BASE}/mensajes/${id}/file/`;
+      return buildApiUrl(`/mensajes/${id}/file/`);
     case 'justificante':
-      return `${API_BASE}/mensajes/justificante/${id}/file/`;
+      return buildApiUrl(`/mensajes/justificante/${id}/file/`);
     case 'gasto':
-      return `${API_BASE}/gastos/${id}/file/`;
+      return buildApiUrl(`/gastos/${id}/file/`);
     default:
       throw new Error(`Unknown file category: ${category}`);
   }

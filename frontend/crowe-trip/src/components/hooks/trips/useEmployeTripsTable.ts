@@ -1,6 +1,7 @@
 // hooks/useEmployeeTripsTable.ts
 import { useEffect, useState } from "react";
 import useAuth from "../use-auth";
+import { apiRequest } from '@config/api';
 
 interface EmployeeTrip {
   name: string;
@@ -20,10 +21,9 @@ export default function useEmployeeTripsTable() {
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/report/empleados/", {
+        const res = await apiRequest("/users/report/empleados/", {
           headers: {
             Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
           },
         });
 

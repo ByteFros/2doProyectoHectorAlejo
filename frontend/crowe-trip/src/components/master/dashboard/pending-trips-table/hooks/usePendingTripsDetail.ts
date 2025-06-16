@@ -1,6 +1,7 @@
 // hooks/usePendingTripsDetail.ts
 import { useState, useEffect } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { buildApiUrl } from '../../../../../config/api';
 
 export interface PendingTrip {
   id: number;
@@ -23,7 +24,7 @@ export default function usePendingTripsDetail(employeeId?: number) {
     if (!token) return;
     setLoading(true);
 
-    const url = new URL('http://127.0.0.1:8000/api/users/viajes/pending/');
+    const url = new URL(buildApiUrl('/users/viajes/pending/'));
     if (employeeId) url.searchParams.append('empleado', String(employeeId));
 
     fetch(url.toString(), {

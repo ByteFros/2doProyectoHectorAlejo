@@ -1,6 +1,7 @@
 // hooks/useCompanies.ts
 import { useState, useEffect, useCallback } from 'react';
 import useAuth from './use-auth';
+import { apiRequest } from '@config/api';
 
 export interface Empresa {
   id: number;
@@ -22,10 +23,9 @@ export default function useCompanies() {
     setError(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empresas/', {
+      const res = await apiRequest('/users/empresas/', {
         headers: {
           Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
@@ -54,11 +54,10 @@ export default function useCompanies() {
 
   const deleteCompany = async (id: number) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/users/empresas/${id}/`, {
+      const res = await apiRequest(`/users/empresas/${id}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
@@ -71,11 +70,10 @@ export default function useCompanies() {
 
   const toggleAutogestion = async (id: number, current: boolean) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/users/empresas/${id}/`, {
+      const res = await apiRequest(`/users/empresas/${id}/`, {
         method: 'PUT',
         headers: {
           Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ permisos: !current }),
       });

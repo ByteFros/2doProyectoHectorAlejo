@@ -1,6 +1,7 @@
 // hooks/useTripsChartGrouped.ts
 import { useState, useEffect } from "react";
 import useAuth from "../use-auth";
+import { apiRequest } from '@config/api';
 
 interface Dataset {
   label: string;
@@ -36,10 +37,9 @@ export default function useTripsChartGrouped() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/viajes/over/", {
+        const res = await apiRequest("/users/viajes/over/", {
           headers: {
             Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
           },
         });
 

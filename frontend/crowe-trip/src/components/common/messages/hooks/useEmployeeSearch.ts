@@ -1,6 +1,7 @@
 // hooks/useEmployeeSearch.ts
 import { useState, useEffect, useMemo } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { apiRequest } from '@config/api';
 
 export interface Employee {
   id: number;
@@ -21,7 +22,7 @@ export default function useEmployeeSearch(searchTerm: string) {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetch('http://127.0.0.1:8000/api/users/empleados/', {
+    apiRequest('/users/empleados/', {
       headers: { Authorization: `Token ${token}` }
     })
       .then(res => {

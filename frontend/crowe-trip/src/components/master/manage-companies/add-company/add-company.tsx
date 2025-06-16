@@ -3,6 +3,7 @@ import { useState } from "react";
 import styles from "./add-company.module.scss";
 import { FaBuilding, FaIdCard, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
 import useAuth from "~/components/hooks/use-auth";
+import { apiRequest } from '@config/api';
 
 export type Empresa = {
     id: number;
@@ -45,12 +46,10 @@ export default function AddCompany({ onAddCompany }: Props) {
     setError(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/users/empresas/new/", {
+      const res = await apiRequest("/users/empresas/new/", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Token ${token}`,
-          
         },
         body: JSON.stringify({
           nombre_empresa: form.nombre,

@@ -1,6 +1,7 @@
 // hooks/useSpends.ts
 import { useState, useEffect } from "react";
 import useAuth from "./use-auth";
+import { apiRequest, buildApiUrl } from "../../config/api";
 
 export interface Gasto {
   id: number;
@@ -25,7 +26,7 @@ export interface NuevoGasto {
   comprobante?: File;
 }
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+
 
 export default function useSpends(currentTripId?: number) {
   const { token } = useAuth();
@@ -43,11 +44,10 @@ export default function useSpends(currentTripId?: number) {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/gastos/`, {
+      const response = await apiRequest("/users/gastos/", {
         method: "GET",
         headers: {
           "Authorization": `Token ${token}`,
-          "Content-Type": "application/json",
         },
       });
 
@@ -102,7 +102,8 @@ export default function useSpends(currentTripId?: number) {
         formData.append("comprobante", gastoData.receipt);
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/gastos/new/`, {
+      // Para FormData, usamos fetch directamente con buildApiUrl
+      const response = await fetch(buildApiUrl("/users/gastos/new/"), {
         method: "POST",
         headers: {
           "Authorization": `Token ${token}`,

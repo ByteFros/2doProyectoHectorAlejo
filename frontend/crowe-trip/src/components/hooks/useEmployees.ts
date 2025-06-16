@@ -1,6 +1,7 @@
 // hooks/useEmployees.ts
 import { useState, useEffect } from 'react';
 import useAuth from './use-auth';
+import { apiRequest } from '../../config/api';
 
 export interface Employee {
   id: number;
@@ -26,12 +27,11 @@ export default function useEmployees(empresaId: number | null, role?: "MASTER" |
 
     try {
       const endpoint = role === "MASTER" && empresaId !== null
-        ? `http://127.0.0.1:8000/api/users/empresas/${empresaId}/empleados/`
-        : `http://127.0.0.1:8000/api/users/empleados/`;
-      const res = await fetch(endpoint, {
+        ? `/users/empresas/${empresaId}/empleados/`
+        : `/users/empleados/`;
+      const res = await apiRequest(endpoint, {
         headers: {
           Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
         },
       });
 
@@ -48,11 +48,10 @@ export default function useEmployees(empresaId: number | null, role?: "MASTER" |
 
   const deleteEmployeeById = async (id: number) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/users/empleados/${id}/`, {
+      const res = await apiRequest(`/users/empleados/${id}/`, {
         method: "DELETE",
         headers: {
           Authorization: `Token ${token}`,
-          "Content-Type": "application/json",
         },
       });
 

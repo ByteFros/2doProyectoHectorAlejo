@@ -2,8 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Message, MessageActions } from './types';
 import useAuth from './use-auth';
-
-const API_BASE_URL = 'http://127.0.0.1:8000/api/users';
+import { buildApiUrl } from '@config/api';
 
 export function useCompanyMessages(): MessageActions {
   const { token } = useAuth();
@@ -15,7 +14,7 @@ export function useCompanyMessages(): MessageActions {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/mensajes/`, {
+      const response = await fetch(buildApiUrl('/mensajes/'), {
         headers: {
           Authorization: `Token ${token}`,
         },
@@ -28,7 +27,7 @@ export function useCompanyMessages(): MessageActions {
         content: msg.motivo,
         timestamp: msg.fecha_creacion,
         reply: msg.respuesta || undefined,
-        attachmentUrl: `${API_BASE_URL}/gastos/${msg.gasto_id}/file/`,
+        attachmentUrl: buildApiUrl(`/gastos/${msg.gasto_id}/file/`),
         status: msg.estado,
         read: true,
       })) as Message[];
@@ -47,10 +46,9 @@ export function useCompanyMessages(): MessageActions {
 
   const approveJustification = async (id: number) => {
     try {
-      await fetch(`${API_BASE_URL}/mensajes/${id}/cambiar-estado/`, {
+      await fetch(buildApiUrl(`/mensajes/${id}/cambiar-estado/`), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Token ${token}`,
         },
         body: JSON.stringify({ estado: 'aprobado' }),
@@ -63,10 +61,9 @@ export function useCompanyMessages(): MessageActions {
 
   const rejectJustification = async (id: number) => {
     try {
-      await fetch(`${API_BASE_URL}/mensajes/${id}/cambiar-estado/`, {
+      await fetch(buildApiUrl(`/mensajes/${id}/cambiar-estado/`), {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Token ${token}`,
         },
         body: JSON.stringify({ estado: 'rechazado' }),
@@ -83,7 +80,7 @@ export function useCompanyMessages(): MessageActions {
     if (file) formData.append('archivo', file);
 
     try {
-      await fetch(`${API_BASE_URL}/mensajes/${replyToId}/responder/`, {
+      await fetch(buildApiUrl(`/mensajes/${replyToId}/responder/`), {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

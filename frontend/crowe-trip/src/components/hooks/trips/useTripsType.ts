@@ -1,6 +1,7 @@
 // hooks/useTripsType.ts
 import { useState, useEffect } from 'react';
 import useAuth from '../use-auth';
+import { apiRequest } from '@config/api';
 
 interface TripsType {
   national: number;
@@ -14,7 +15,7 @@ export default function useTripsType() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/users/report/trips-type/', {
+    apiRequest('/users/report/trips-type/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => res.json())

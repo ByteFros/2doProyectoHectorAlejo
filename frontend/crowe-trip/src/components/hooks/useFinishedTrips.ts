@@ -1,6 +1,7 @@
 // hooks/useFinishedTrips.ts
 import { useEffect, useState } from 'react';
 import useAuth from './use-auth';
+import { apiRequest } from '@config/api';
 
 export interface FinishedTrip {
   id: number;
@@ -26,10 +27,9 @@ export default function useFinishedTrips() {
     const fetchTrips = async () => {
       setLoading(true);
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/users/viajes/over/', {
+        const res = await apiRequest('/users/viajes/over/', {
           headers: {
             Authorization: `Token ${token}`,
-            'Content-Type': 'application/json',
           },
         });
 

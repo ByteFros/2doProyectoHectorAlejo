@@ -1,6 +1,7 @@
 // hooks/usePendingEmployeesByCompany.ts
 import { useState, useEffect } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { apiRequest } from '@config/api';
 
 export interface Employee {
   id: number;
@@ -19,7 +20,7 @@ export default function usePendingEmployeesByCompany(companyId?: number) {
   useEffect(() => {
     if (!token || !companyId) return;
 
-    fetch(`http://127.0.0.1:8000/api/users/empresas/${companyId}/empleados/pending/`, {
+    apiRequest(`/users/empresas/${companyId}/empleados/pending/`, {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {

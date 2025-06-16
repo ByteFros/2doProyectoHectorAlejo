@@ -6,9 +6,14 @@
   "version": "1.0.0",
   "scripts": {
     "build": "remix vite:build",
+    "build:production": "NODE_ENV=production remix vite:build",
     "dev": "remix vite:dev",
+    "preview": "vite preview",
+    "start": "remix-serve build/index.js",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "find-hardcoded-urls": "grep -r 'http://127.0.0.1:8000' src/ --include='*.ts' --include='*.tsx' || echo 'No hardcoded URLs found'",
+    "check-config": "node -e \"console.log('API Base URL:', process.env.VITE_API_BASE_URL || 'undefined')\""
   },
   "dependencies": {
     "@blueprintjs/core": "^5.16.2",

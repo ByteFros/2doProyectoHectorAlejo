@@ -13,27 +13,41 @@ export default defineConfig({
         netlifyPlugin(),
     ],
 
-    // probaremos esto despues de crear el contenedor 
     server: {
         host: '0.0.0.0',
         port: 5173,
+        // Permitir conexiones desde crowe.bronixia.es
+        allowedHosts: [
+            'localhost',
+            '127.0.0.1',
+            'crowe.bronixia.es',
+            '.bronixia.es' // wildcard para subdominios
+        ],
         proxy: {
-            // Interceptar todas las peticiones a 127.0.0.1:8000 y redirigirlas al backend
-            'http://127.0.0.1:8000': {
-                target: 'http://backend:8000',
-                changeOrigin: true,
-                rewrite: (path) => path.replace(/^http:\/\/127\.0\.0\.1:8000/, ''),
-            },
-            // Alternativa: si prefieres usar rutas relativas
+            // Solo usar proxy en desarrollo
             '/api': {
-                target: 'http://backend:8000',
+                target: process.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000',
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, '/api'),
             }
         }
+    },
+    
+    preview: {
+        host: '0.0.0.0',
+        port: 4173,
+        // También permitir hosts en preview mode
+        allowedHosts: [
+            'localhost',
+            '127.0.0.1', 
+            'crowe.bronixia.es',
+            '.bronixia.es'
+        ]
     },
     resolve: {
         alias: {
             '@styles': path.resolve(__dirname, './src/styles/'),
+            '@config': path.resolve(__dirname, './src/config/'),
         },
     },
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiRequest } from "@config/api";
 
 interface User {
     username: string;
@@ -24,14 +25,11 @@ export default function useUser() {
                     throw new Error("No se encontró el token de autenticación");
                 }
 
-                const response = await fetch("http://127.0.0.1:8000/api/users/profile/", {
+                const response = await apiRequest("/users/profile/", {
                     method: "GET",
                     headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Token ${token}`, // 🔥 Enviar el token en la cabecera
+                        "Authorization": `Token ${token}`,
                     },
-                    credentials: "include",
-                    
                 });
 
                 if (!response.ok) throw new Error("No se pudo obtener la información del usuario");

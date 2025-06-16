@@ -1,8 +1,7 @@
 // hooks/useConversationMessages.ts
 import { useState, useEffect, useCallback } from 'react';
 import useAuth from '~/components/hooks/use-auth';
-
-const API_BASE = 'http://127.0.0.1:8000/api/users';
+import { buildApiUrl } from '@config/api';
 
 export interface Message {
   id: number;
@@ -25,7 +24,7 @@ export default function useConversationMessages(conversationId: number | null) {
   useEffect(() => {
     if (!token || conversationId == null) return;
     setLoading(true);
-    fetch(`${API_BASE}/conversaciones/${conversationId}/mensajes/`, {
+    fetch(buildApiUrl(`/conversaciones/${conversationId}/mensajes/`), {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {
@@ -56,7 +55,7 @@ export default function useConversationMessages(conversationId: number | null) {
       if (gastoId != null) form.append('gasto_id', String(gastoId));
       if (archivo)    form.append('archivo', archivo);
 
-      const res = await fetch(`${API_BASE}/mensajes/enviar/`, {
+      const res = await fetch(buildApiUrl('/mensajes/enviar/'), {
         method: 'POST',
         headers: {
           Authorization: `Token ${token}`,

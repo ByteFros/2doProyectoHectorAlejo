@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import useAuth from "./use-auth";
 import { Trip, Expense, Weather } from "./types";
 import { getWeather } from "../../utils/web";
+import { apiRequest } from "../../config/api";
 
 interface Viaje {
     id: number;
@@ -27,13 +28,11 @@ export default function useTrips() {
         const fetchViajes = async () => {
             if (!token) return;
             try {
-                const res = await fetch("http://127.0.0.1:8000/api/users/viajes/all/", {
+                const res = await apiRequest("/users/viajes/all/", {
                     method: "GET",
                     headers: {
-                        "Content-Type": "application/json",
                         Authorization: `Token ${token}`,
                     },
-                    credentials: "include",
                 });
 
                 if (!res.ok) throw new Error("Error al obtener viajes.");
@@ -58,13 +57,11 @@ export default function useTrips() {
     const getViajeEnCurso = async () => {
         if (!token) return null;
         try {
-            const res = await fetch("http://127.0.0.1:8000/api/users/viajes/en-curso/", {
+            const res = await apiRequest("/users/viajes/en-curso/", {
                 method: "GET",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Token ${token}`,
                 },
-                credentials: "include",
             });
 
             if (res.status === 204) {
@@ -103,13 +100,11 @@ export default function useTrips() {
     const finalizarViaje = async (viajeId: number) => {
         if (!token) return { error: "No autenticado" };
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/users/viajes/${viajeId}/end/`, {
+            const res = await apiRequest(`/users/viajes/${viajeId}/end/`, {
                 method: "PUT",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Token ${token}`,
                 },
-                credentials: "include",
             });
 
             if (!res.ok) {
@@ -135,13 +130,11 @@ export default function useTrips() {
     const crearViaje = async (viajeData: Omit<Viaje, "id" | "estado">) => {
         if (!token) return { error: "No autenticado" };
         try {
-            const res = await fetch("http://127.0.0.1:8000/api/users/viajes/new/", {
+            const res = await apiRequest("/users/viajes/new/", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
                     Authorization: `Token ${token}`,
                 },
-                credentials: "include",
                 body: JSON.stringify(viajeData),
             });
 

@@ -1,6 +1,7 @@
 // expenses-table/expenses-table.tsx
 import { useState } from "react";
 import styles from "./expenses-table.module.scss";
+import { apiRequest, buildApiUrl } from '@config/api';
 
 interface Gasto {
   id: number;
@@ -28,7 +29,7 @@ export default function ExpensesTable({ expenses }: Props) {
   const handleDeleteSelected = async () => {
     for (const id of selectedExpenses) {
       try {
-        await fetch(`http://127.0.0.1:8000/api/users/gastos/edit/${id}/`, {
+        await apiRequest(`/users/gastos/edit/${id}/`, {
           method: "DELETE",
           headers: {
             Authorization: `Token ${localStorage.getItem("token")}`,
@@ -45,7 +46,8 @@ export default function ExpensesTable({ expenses }: Props) {
     const token = localStorage.getItem("token");
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/users/gastos/${expenseId}/file/`, {
+      // Para respuestas de archivos, usar fetch con buildApiUrl
+      const response = await fetch(buildApiUrl(`/users/gastos/${expenseId}/file/`), {
         method: "GET",
         headers: {
           Authorization: `Token ${token}`,

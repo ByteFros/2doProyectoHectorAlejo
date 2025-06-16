@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { apiRequest } from '@config/api';
 
 export default function usePendingTripsCount() {
   const { token } = useAuth();
@@ -8,7 +9,7 @@ export default function usePendingTripsCount() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/users/viajes/all/', {
+    apiRequest('/users/viajes/all/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => {

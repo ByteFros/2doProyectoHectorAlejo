@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from './messages.module.scss';
 import useAuth from '~/components/hooks/use-auth';
+import { apiRequest } from '@config/api';
 
 interface Expense {
   id: number;
@@ -32,7 +33,7 @@ const ExpenseSelector: React.FC<ExpenseSelectorProps> = ({ onSelectExpense, sele
       setError(null);
       
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/gastos/pendientes/', {
+        const response = await apiRequest('/gastos/pendientes/', {
           headers: {
             'Authorization': `Token ${token}`,
           },

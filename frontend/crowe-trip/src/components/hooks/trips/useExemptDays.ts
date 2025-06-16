@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import useAuth from '../use-auth';
+import { apiRequest } from '@config/api';
 
 interface ExemptDays {
   exempt: number;
@@ -18,7 +19,7 @@ export default function useExemptDays() {
       setLoading(false);
       return;
     }
-    fetch('http://127.0.0.1:8000/api/users/report/exempt-days/', {
+    apiRequest('/users/report/exempt-days/', {
       headers: { Authorization: `Token ${token}` },
     })
       .then(res => res.json())

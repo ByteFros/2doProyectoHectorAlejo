@@ -1,6 +1,7 @@
 // hooks/usePendingCompanies.ts
 import { useState, useEffect } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { apiRequest } from '../../../../../config/api';
 
 interface Company {
     id: number;
@@ -14,7 +15,7 @@ export default function usePendingCompanies() {
 
     useEffect(() => {
         if (!token) return;
-        fetch('http://127.0.0.1:8000/api/users/report/companies/pending/', {
+        apiRequest('/users/report/companies/pending/', {
             headers: { Authorization: `Token ${token}` },
         })
             .then(res => res.json())
