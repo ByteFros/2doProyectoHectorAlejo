@@ -3,7 +3,7 @@ node_modules
 /.cache
 /public/build
 /build
-.env
+.env.production
 
 # Local Netlify folder
 .netlify

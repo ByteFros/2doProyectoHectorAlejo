@@ -1,5 +1,6 @@
 // hooks/useEmployeeSearch.ts
 import { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta si el path cambia
 import useAuth from '~/components/hooks/use-auth';
 
 export interface Employee {
@@ -14,31 +15,32 @@ export interface Employee {
 export default function useEmployeeSearch(searchTerm: string) {
   const { token } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 1. Cargamos todos los empleados al montar
+  // 1. Cargar empleados desde backend
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetch('http://127.0.0.1:8000/api/users/empleados/', {
-      headers: { Authorization: `Token ${token}` }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('No pude cargar empleados');
-        return res.json();
-      })
-      .then((data: Employee[]) => {
+
+    const fetchData = async () => {
+      try {
+        const response = await apiFetch('/api/users/empleados/', {}, true);
+        if (!response.ok) throw new Error('No pude cargar empleados');
+        const data: Employee[] = await response.json();
         setEmployees(data);
-      })
-      .catch(e => {
+      } catch (e) {
         console.error(e);
-        setError(e.message);
-      })
-      .finally(() => setLoading(false));
+        setError((e as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token]);
 
-  // 2. Filtramos según searchTerm (nombre, apellido o empresa)
+  // 2. Filtro local de empleados según el término
   const suggestions = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return [];

@@ -1,6 +1,6 @@
-// expenses-table/expenses-table.tsx
 import { useState } from "react";
 import styles from "./expenses-table.module.scss";
+import { apiFetch } from "~/utils/api"; // Ajusta si es necesario
 
 interface Gasto {
   id: number;
@@ -28,14 +28,12 @@ export default function ExpensesTable({ expenses }: Props) {
   const handleDeleteSelected = async () => {
     for (const id of selectedExpenses) {
       try {
-        await fetch(`http://127.0.0.1:8000/api/users/gastos/edit/${id}/`, {
+        const res = await apiFetch(`/api/users/gastos/edit/${id}/`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Token ${localStorage.getItem("token")}`,
-          },
-        });
+        }, true);
+        if (!res.ok) throw new Error("Error al eliminar gasto");
       } catch (error) {
-        console.error("Error al eliminar gasto", id);
+        console.error("❌ Error al eliminar gasto", id, error);
       }
     }
     window.location.reload();
@@ -43,14 +41,16 @@ export default function ExpensesTable({ expenses }: Props) {
 
   const handlePreviewFile = async (expenseId: number) => {
     const token = localStorage.getItem("token");
+    if (!token) return;
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/users/gastos/${expenseId}/file/`, {
-        method: "GET",
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/users/gastos/${expenseId}/file/`,
+        {
+          method: "GET",
+          headers: { Authorization: `Token ${token}` },
+        }
+      );
 
       if (!response.ok) {
         throw new Error("No se pudo cargar el archivo");
@@ -60,22 +60,20 @@ export default function ExpensesTable({ expenses }: Props) {
       const url = URL.createObjectURL(blob);
       setPreviewFile({ url, type: blob.type });
     } catch (error) {
-      console.error("Error al previsualizar archivo:", error);
+      console.error("❌ Error al previsualizar archivo:", error);
     }
   };
 
   const closePreview = () => setPreviewFile(null);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("es-ES");
-  };
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("es-ES");
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("es-ES", {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("es-ES", {
       style: "currency",
       currency: "EUR",
     }).format(amount);
-  };
 
   return (
     <div className={styles.expensesContainer}>

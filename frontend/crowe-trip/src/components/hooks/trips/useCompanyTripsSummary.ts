@@ -1,5 +1,6 @@
-2// hooks/useCompanyTripsSummary.ts
+// hooks/useCompanyTripsSummary.ts
 import { useState, useEffect } from "react";
+import { apiFetch } from "~/utils/api"; // Asegúrate de que el path sea correcto
 import useAuth from "../use-auth";
 
 interface CompanySummary {
@@ -17,15 +18,21 @@ export default function useCompanyTripsSummary() {
 
   useEffect(() => {
     if (!token) return;
-    fetch("http://127.0.0.1:8000/api/users/report/viajes/", {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    })
-      .then(res => res.json())
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+    const fetchData = async () => {
+      try {
+        const response = await apiFetch("/api/users/report/viajes/", {}, true);
+        if (!response.ok) throw new Error("Error al obtener el resumen de viajes por empresa");
+        const result = await response.json();
+        setData(result);
+      } catch (error) {
+        console.error("❌ Error al cargar resumen por empresa:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token]);
 
   return { data, loading };

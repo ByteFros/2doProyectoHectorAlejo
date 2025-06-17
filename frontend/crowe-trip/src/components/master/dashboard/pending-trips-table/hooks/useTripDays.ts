@@ -1,6 +1,7 @@
 // hooks/useTripDays.ts
 import { useState, useEffect } from 'react'
 import useAuth from '~/components/hooks/use-auth'
+import { apiFetch } from '~/utils/api'
 
 export interface TripDay {
   id: number
@@ -15,19 +16,34 @@ export default function useTripDays(tripId?: number) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!token || !tripId) return
+    if (!token || !tripId) {
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
 
-    fetch(`http://127.0.0.1:8000/api/users/viajes/${tripId}/dias/`, {
-      headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
-    })
-    .then(r => {
-      if (!r.ok) throw new Error('No pude cargar los días')
-      return r.json()
-    })
-    .then((days: TripDay[]) => setData(days))
-    .catch(console.error)
-    .finally(() => setLoading(false))
+    const fetchTripDays = async () => {
+      try {
+        const response = await apiFetch(`/api/users/viajes/${tripId}/dias/`, {
+          method: 'GET',
+        }, true) // Pasamos true para indicar que requiere auth
+
+        if (!response.ok) {
+          throw new Error('No se pudieron cargar los días del viaje')
+        }
+
+        const days = await response.json()
+        setData(days)
+      } catch (error) {
+        console.error('❌ Error al cargar días del viaje:', error)
+        setData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTripDays()
   }, [token, tripId])
 
   return { data, loading }

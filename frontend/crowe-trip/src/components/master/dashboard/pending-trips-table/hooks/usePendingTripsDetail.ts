@@ -1,5 +1,6 @@
 // hooks/usePendingTripsDetail.ts
 import { useState, useEffect } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta el path si es necesario
 import useAuth from '~/components/hooks/use-auth';
 
 export interface PendingTrip {
@@ -10,7 +11,7 @@ export interface PendingTrip {
   notes: string[];
   companyVisited: string;
   employeeName: string;
-  employeeId: number; // Añadido para facilitar el filtrado de empleados
+  employeeId: number;
 }
 
 export default function usePendingTripsDetail(employeeId?: number) {
@@ -23,22 +24,24 @@ export default function usePendingTripsDetail(employeeId?: number) {
     if (!token) return;
     setLoading(true);
 
-    const url = new URL('http://127.0.0.1:8000/api/users/viajes/pending/');
-    if (employeeId) url.searchParams.append('empleado', String(employeeId));
+    const fetchData = async () => {
+      try {
+        const query = employeeId ? `?empleado=${employeeId}` : '';
+        const response = await apiFetch(`/api/users/viajes/pending/${query}`, {}, true);
 
-    fetch(url.toString(), {
-      headers: { Authorization: `Token ${token}` },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Error al cargar viajes pendientes');
-        return res.json();
-      })
-      .then(({ count, trips }: { count: number; trips: PendingTrip[] }) => {
-        setCount(count);
-        setTrips(trips);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+        if (!response.ok) throw new Error('Error al cargar viajes pendientes');
+
+        const data: { count: number; trips: PendingTrip[] } = await response.json();
+        setCount(data.count);
+        setTrips(data.trips);
+      } catch (error) {
+        console.error('❌ Error al obtener viajes pendientes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token, employeeId]);
 
   return { trips, count, loading };

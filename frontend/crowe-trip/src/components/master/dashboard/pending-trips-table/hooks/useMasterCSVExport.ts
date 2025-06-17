@@ -1,5 +1,6 @@
 // hooks/useCSVExport.ts
 import useAuth from "~/components/hooks/use-auth";
+import { apiFetch } from "~/utils/api";
 
 export default function useCSVExport() {
   const { token, role } = useAuth();
@@ -11,25 +12,23 @@ export default function useCSVExport() {
     }
 
     const endpoint = role === 'MASTER'
-      ? 'http://127.0.0.1:8000/api/users/export/viajes/exportar/'
-      : 'http://127.0.0.1:8000/api/users/export/empresa/viajes/exportar/';
+      ? '/api/users/export/viajes/exportar/'
+      : '/api/users/export/empresa/viajes/exportar/';
 
     const filename = role === 'MASTER'
       ? 'viajes_todas_empresas.csv'
       : 'viajes_empresa.csv';
 
     try {
-      const res = await fetch(endpoint, {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      });
+      const response = await apiFetch(endpoint, {
+        method: 'GET',
+      }, true); // Indicamos que requiere autenticación
 
-      if (!res.ok) {
-        throw new Error(`No se pudo generar el CSV. Código ${res.status}`);
+      if (!response.ok) {
+        throw new Error(`No se pudo generar el CSV. Código ${response.status}`);
       }
 
-      const blob = await res.blob();
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
@@ -38,6 +37,11 @@ export default function useCSVExport() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Liberamos el objeto URL una vez descargado
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 100);
     } catch (error) {
       console.error('❌ Error al exportar CSV:', error);
       alert('Error al exportar el archivo. Inténtalo nuevamente.');

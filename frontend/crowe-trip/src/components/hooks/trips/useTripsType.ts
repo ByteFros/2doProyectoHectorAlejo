@@ -1,5 +1,6 @@
 // hooks/useTripsType.ts
 import { useState, useEffect } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta la ruta si es distinta
 import useAuth from '../use-auth';
 
 interface TripsType {
@@ -14,13 +15,21 @@ export default function useTripsType() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/users/report/trips-type/', {
-      headers: { Authorization: `Token ${token}` },
-    })
-      .then(res => res.json())
-      .then((json: TripsType) => setData(json))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+    const fetchData = async () => {
+      try {
+        const response = await apiFetch('/api/users/report/trips-type/', {}, true);
+        if (!response.ok) throw new Error('Error al obtener el resumen de tipo de viajes');
+        const result: TripsType = await response.json();
+        setData(result);
+      } catch (error) {
+        console.error('❌ Error al cargar tipos de viajes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token]);
 
   return { data, loading };

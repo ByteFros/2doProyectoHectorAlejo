@@ -1,5 +1,6 @@
 // hooks/useEmployeeCityStats.ts
 import { useEffect, useState } from "react";
+import { apiFetch } from "~/utils/api"; // Ajusta si es necesario
 import useAuth from "./use-auth";
 
 interface CityStats {
@@ -21,19 +22,13 @@ export default function useEmployeeCityStats() {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/empleados/ciudades/", {
-          headers: {
-            Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
+        const response = await apiFetch("/api/users/empleados/ciudades/", {}, true);
+        if (!response.ok) throw new Error("Error al obtener ciudades del empleado");
 
-        if (!res.ok) throw new Error("Error al obtener ciudades del empleado");
-
-        const data = await res.json();
+        const data: CityStats[] = await response.json();
         setCities(data);
       } catch (err) {
-        console.error("❌ Error en fetch de ciudades por empleado", err);
+        console.error("❌ Error en fetch de ciudades por empleado:", err);
         setError("No se pudo cargar la información de ciudades");
       } finally {
         setLoading(false);

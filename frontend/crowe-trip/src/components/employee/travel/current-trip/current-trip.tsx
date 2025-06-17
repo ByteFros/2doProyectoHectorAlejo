@@ -38,15 +38,17 @@ export default function CurrentTrip() {
 
     // Cargar viaje actual
     useEffect(() => {
-        const loadCurrentTrip = async () => {
-            if (token) {
-                setIsLoading(true);
-                await getViajeEnCurso();
-                setIsLoading(false);
-            }
-        };
-        loadCurrentTrip();
-    }, [token]);
+    const loadCurrentTrip = async () => {
+        if (token) {
+            setIsLoading(true);
+            const viaje = await getViajeEnCurso(); // ✅ Guardamos el viaje recuperado
+            setCurrentTrip(viaje);                // ✅ Lo asignamos explícitamente al estado
+            setIsLoading(false);
+        }
+    };
+    loadCurrentTrip();
+}, [token]);
+
 
     // Finalizar viaje
     const handleEndTrip = async () => {

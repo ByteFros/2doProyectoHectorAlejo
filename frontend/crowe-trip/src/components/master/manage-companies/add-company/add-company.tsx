@@ -2,6 +2,7 @@
 import { useState } from "react";
 import styles from "./add-company.module.scss";
 import { FaBuilding, FaIdCard, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
+import { apiFetch } from "~/utils/api"; // Ajusta si el path cambia
 import useAuth from "~/components/hooks/use-auth";
 
 export type Empresa = {
@@ -40,58 +41,57 @@ export default function AddCompany({ onAddCompany }: Props) {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError(null);
 
-    try {
-      const res = await fetch("http://127.0.0.1:8000/api/users/empresas/new/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
-          
-        },
+  try {
+    const response = await apiFetch(
+      '/api/users/empresas/new/',
+      {
+        method: 'POST',
         body: JSON.stringify({
           nombre_empresa: form.nombre,
           nif: form.nif,
           address: form.domicilio,
-          city: "",
-          postal_code: "",
+          city: '',
+          postal_code: '',
           correo_contacto: form.correo,
           permisos: form.autogestion,
         }),
-      });
+      },
+      true // requireAuth = true
+    );
 
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Error al registrar la empresa");
-      }
-
-      const newEmpresa = await res.json();
-
-      onAddCompany({
-        id: newEmpresa.id,
-        nombre: newEmpresa.nombre_empresa,
-        nif: newEmpresa.nif,
-        domicilio: newEmpresa.address,
-        autogestion: newEmpresa.permisos,
-      });
-
-      setSubmitted(true);
-      setForm({
-        nombre: "",
-        nif: "",
-        domicilio: "",
-        correo: "",
-        autogestion: false,
-      });
-
-      setTimeout(() => setSubmitted(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.error || 'Error al registrar la empresa');
     }
-  };
+
+    const newEmpresa = await response.json();
+
+    onAddCompany({
+      id: newEmpresa.id,
+      nombre: newEmpresa.nombre_empresa,
+      nif: newEmpresa.nif,
+      domicilio: newEmpresa.address,
+      autogestion: newEmpresa.permisos,
+    });
+
+    setSubmitted(true);
+    setForm({
+      nombre: '',
+      nif: '',
+      domicilio: '',
+      correo: '',
+      autogestion: false,
+    });
+
+    setTimeout(() => setSubmitted(false), 3000);
+  } catch (err: any) {
+    setError(err.message);
+  }
+};
 
     return (
         <div className={styles.formContainer}>

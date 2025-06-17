@@ -1,5 +1,6 @@
 // hooks/useRegisterEmployees.ts
 import { useState } from 'react';
+import { apiFetch } from '~/utils/api'; // Asegúrate de ajustar el path
 import useAuth from '../use-auth';
 
 interface EmployeePayload {
@@ -25,17 +26,17 @@ export default function useRegisterEmployees() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empleados/nuevo/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${token}`,
-          'Content-Type': 'application/json',
+      const response = await apiFetch(
+        '/api/users/empleados/nuevo/',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
         },
-        body: JSON.stringify(data),
-      });
+        true
+      );
 
-      if (!res.ok) {
-        const errData = await res.json();
+      if (!response.ok) {
+        const errData = await response.json();
         throw new Error(errData.error || 'Error al registrar empleado');
       }
 
@@ -55,17 +56,18 @@ export default function useRegisterEmployees() {
     formData.append('file', file);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empleados/batch-upload/', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${token}`,
+      const response = await apiFetch(
+        '/api/users/empleados/batch-upload/',
+        {
+          method: 'POST',
+          body: formData,
         },
-        body: formData,
-      });
+        true // Token incluido automáticamente
+      );
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error(data.error || 'Error al subir CSV');
       }
 
@@ -74,7 +76,6 @@ export default function useRegisterEmployees() {
       if (data.errores?.length > 0) {
         setError(`${data.errores.length} errores al procesar el archivo.`);
       }
-
     } catch (err: any) {
       setError(err.message);
     } finally {

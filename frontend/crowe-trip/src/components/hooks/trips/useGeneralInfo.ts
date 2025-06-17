@@ -1,5 +1,6 @@
 // hooks/useGeneralInfo.ts
 import { useState, useEffect } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta el path si es necesario
 import useAuth from '../use-auth';
 
 interface GeneralInfo {
@@ -21,13 +22,21 @@ export default function useGeneralInfo() {
 
   useEffect(() => {
     if (!token) return;
-    fetch('http://127.0.0.1:8000/api/users/report/general-info/', {
-      headers: { Authorization: `Token ${token}` },
-    })
-      .then(res => res.json())
-      .then((json: GeneralInfo) => setData(json))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+    const fetchData = async () => {
+      try {
+        const response = await apiFetch('/api/users/report/general-info/', {}, true);
+        if (!response.ok) throw new Error('Error al obtener la información general');
+        const result: GeneralInfo = await response.json();
+        setData(result);
+      } catch (error) {
+        console.error('❌ Error al cargar información general:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token]);
 
   return { data, loading };

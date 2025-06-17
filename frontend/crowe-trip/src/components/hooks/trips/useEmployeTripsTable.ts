@@ -1,5 +1,6 @@
 // hooks/useEmployeeTripsTable.ts
 import { useEffect, useState } from "react";
+import { apiFetch } from "~/utils/api"; // Ajusta el path si es necesario
 import useAuth from "../use-auth";
 
 interface EmployeeTrip {
@@ -20,20 +21,13 @@ export default function useEmployeeTripsTable() {
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/users/report/empleados/", {
-          headers: {
-            Authorization: `Token ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
+        const response = await apiFetch("/api/users/report/empleados/", {}, true);
+        if (!response.ok) throw new Error("Error al obtener el resumen de viajes");
 
-        if (!res.ok) throw new Error("Error al obtener el resumen de viajes");
-
-        const summary = await res.json();
-
-        setEmployees(summary); // ✅ Usa los datos tal cual llegan del backend
+        const summary: EmployeeTrip[] = await response.json();
+        setEmployees(summary);
       } catch (err) {
-        console.error("❌ Error cargando el resumen de viajes", err);
+        console.error("❌ Error cargando el resumen de viajes:", err);
       } finally {
         setLoading(false);
       }

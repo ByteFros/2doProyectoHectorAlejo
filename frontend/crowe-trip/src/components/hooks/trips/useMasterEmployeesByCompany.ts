@@ -1,11 +1,12 @@
 // hooks/useMasterEmployeesByCompany.ts
 import { useState } from "react";
+import { apiFetch } from "~/utils/api"; // Ajusta si es necesario
 import useAuth from "../use-auth";
 
 interface EmployeeTrip {
   name: string;
   trips: number;
-  travelDays: number; // Notar que esto corresponde a 'days' en la tabla
+  travelDays: number;
   exemptDays: number;
   nonExemptDays: number;
 }
@@ -16,7 +17,6 @@ export default function useMasterEmployeesByCompany() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Función para obtener los empleados de una empresa específica
   const fetchEmployeesByCompany = async (companyId: string) => {
     if (!token) return;
 
@@ -24,19 +24,17 @@ export default function useMasterEmployeesByCompany() {
     setError(null);
 
     try {
-      // Esta URL debería ser modificada para apuntar al endpoint correcto para usuarios MASTER
-      const res = await fetch(`http://127.0.0.1:8000/api/users/report/empresa/${companyId}/empleados/viajes/`, {
-        headers: {
-          Authorization: `Token ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await apiFetch(
+        `/api/users/report/empresa/${companyId}/empleados/viajes/`,
+        {},
+        true
+      );
 
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error("Error al obtener información de los empleados");
       }
 
-      const data = await res.json();
+      const data: EmployeeTrip[] = await response.json();
       setEmployees(data);
     } catch (err) {
       console.error("❌ Error cargando los empleados", err);

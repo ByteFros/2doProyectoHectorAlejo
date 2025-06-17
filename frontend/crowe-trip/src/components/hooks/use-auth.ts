@@ -1,5 +1,7 @@
+// hooks/use-auth.ts
 import { useEffect, useState } from "react";
 import { useNavigate } from "@remix-run/react";
+import { apiFetch } from "~/utils/api"; // Ajusta el path si es distinto
 
 export type UserRole = "MASTER" | "EMPRESA" | "EMPLEADO" | null;
 
@@ -14,7 +16,6 @@ export default function useAuth() {
     const [hasCheckedSession, setHasCheckedSession] = useState(false);
     const navigate = useNavigate();
 
-    // ✅ Verificar sesión activa si hay token en localStorage
     useEffect(() => {
         const savedToken = localStorage.getItem("token");
         if (!savedToken) {
@@ -25,14 +26,9 @@ export default function useAuth() {
 
         const checkSession = async () => {
             try {
-                const response = await fetch("http://127.0.0.1:8000/api/users/session/", {
+                const response = await apiFetch("/api/users/session/", {
                     method: "GET",
-                    headers: {
-                        Authorization: `Token ${savedToken}`,
-                        "Content-Type": "application/json",
-                    },
-                    credentials: "include",
-                });
+                }, true);
 
                 if (response.ok) {
                     const data = await response.json();
@@ -63,7 +59,7 @@ export default function useAuth() {
             } catch (err) {
                 console.error("❌ Error al verificar sesión activa:", err);
             } finally {
-                setHasCheckedSession(true); // 💡 Muy importante
+                setHasCheckedSession(true);
             }
         };
 
@@ -72,7 +68,6 @@ export default function useAuth() {
         }
     }, [hasCheckedSession]);
 
-    // 🔁 Redirección automática según rol
     useEffect(() => {
         if (role && token) {
             const roleToPath: Record<string, string> = {
@@ -91,11 +86,9 @@ export default function useAuth() {
 
     const login = async (username: string, password: string) => {
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/users/login/", {
+            const response = await apiFetch("/api/users/login/", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
-                credentials: "include",
             });
 
             if (!response.ok) return false;
@@ -138,14 +131,9 @@ export default function useAuth() {
 
     const logout = async () => {
         try {
-            await fetch("http://127.0.0.1:8000/api/users/logout/", {
+            await apiFetch("/api/users/logout/", {
                 method: "POST",
-                headers: {
-                    Authorization: `Token ${token}`,
-                    "Content-Type": "application/json",
-                },
-                credentials: "include",
-            });
+            }, true);
         } catch (error) {
             console.error("❌ Error al cerrar sesión:", error);
         } finally {
@@ -162,7 +150,7 @@ export default function useAuth() {
             setEmpresaId(null);
             setEmpleadoId(null);
             setMustChangePassword(false);
-            setHasCheckedSession(true); // ✅ Muy importante para evitar reinicio del ciclo
+            setHasCheckedSession(true);
 
             navigate("/");
         }
@@ -172,14 +160,10 @@ export default function useAuth() {
         if (!token) return { success: false, error: "No hay token." };
 
         try {
-            const response = await fetch("http://127.0.0.1:8000/api/users/change-password/", {
+            const response = await apiFetch("/api/users/change-password/", {
                 method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Token ${token}`,
-                },
                 body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
-            });
+            }, true);
 
             const data = await response.json();
 

@@ -1,5 +1,6 @@
 // hooks/usePendingEmployeesByCompany.ts
 import { useState, useEffect } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta si es necesario
 import useAuth from '~/components/hooks/use-auth';
 
 export interface Employee {
@@ -19,16 +20,26 @@ export default function usePendingEmployeesByCompany(companyId?: number) {
   useEffect(() => {
     if (!token || !companyId) return;
 
-    fetch(`http://127.0.0.1:8000/api/users/empresas/${companyId}/empleados/pending/`, {
-      headers: { Authorization: `Token ${token}` },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Error cargando empleados pendientes');
-        return res.json();
-      })
-      .then((emps: Employee[]) => setData(emps))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const fetchData = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/users/empresas/${companyId}/empleados/pending/`,
+          {},
+          true
+        );
+
+        if (!response.ok) throw new Error('Error cargando empleados pendientes');
+
+        const emps: Employee[] = await response.json();
+        setData(emps);
+      } catch (error) {
+        console.error('❌ Error al obtener empleados pendientes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, [token, companyId]);
 
   return { data, loading };

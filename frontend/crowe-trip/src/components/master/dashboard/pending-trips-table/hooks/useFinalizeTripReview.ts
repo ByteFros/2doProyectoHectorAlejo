@@ -1,6 +1,7 @@
 // hooks/useFinalizeTripReview.ts
 import { useState } from 'react';
 import useAuth from '~/components/hooks/use-auth';
+import { apiFetch } from '~/utils/api';
 
 interface TripDayUpdate {
     id: number;
@@ -13,7 +14,7 @@ interface FinalizeResult {
 }
 
 export default function useFinalizeTripReview() {
-    const { token } = useAuth(); // ✅ usamos el hook de autenticación
+    const { token } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -27,30 +28,29 @@ export default function useFinalizeTripReview() {
 
         if (!token) {
             setError("No hay token de autenticación.");
+            setLoading(false);
             return { success: false, message: "No autenticado" };
         }
 
         try {
-            const response = await fetch(`http://127.0.0.1:8000/api/users/viajes/${viajeId}/finalizar_revision/`, {
+            const response = await apiFetch(`/api/users/viajes/${viajeId}/finalizar_revision/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Token ${token}`,
-                },
                 body: JSON.stringify({ motivo, dias }),
-            });
+            }, true); // Indicamos que requiere autenticación
 
             const data = await response.json();
 
             if (!response.ok) {
-                setError(data.error || 'Error inesperado del servidor');
-                return { success: false, message: data.error || 'Error' };
+                const errorMsg = data.error || 'Error inesperado del servidor';
+                setError(errorMsg);
+                return { success: false, message: errorMsg };
             }
 
             return { success: true, message: data.message || 'Revisión finalizada' };
         } catch (err: any) {
-            setError(err.message || 'Error de red');
-            return { success: false, message: err.message };
+            const errorMsg = err.message || 'Error de red';
+            setError(errorMsg);
+            return { success: false, message: errorMsg };
         } finally {
             setLoading(false);
         }

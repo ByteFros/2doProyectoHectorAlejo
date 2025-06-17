@@ -1,5 +1,7 @@
+// hooks/useFilePreview.ts
 import { useState, useCallback, useEffect } from 'react';
 import useAuth from '../use-auth';
+import { apiFetch } from '~/utils/api';
 
 // Define the allowed file categories/endpoints
 export type FileCategory = 'mensaje' | 'justificante' | 'gasto';
@@ -19,19 +21,17 @@ export interface PreviewFile {
   expenseInfo?: ExpenseInfo;
 }
 
-const API_BASE = 'http://127.0.0.1:8000/api/users';
-
-// Helper: build the correct URL according to category and ID
-function buildFileUrl(category: FileCategory, id: number): string {
+// Helper: build the correct endpoint path according to category and ID
+function buildFilePath(category: FileCategory, id: number): string {
   switch (category) {
     case 'mensaje':
-      return `${API_BASE}/mensajes/${id}/file/`;
+      return `/api/users/mensajes/${id}/file/`;
     case 'justificante':
-      return `${API_BASE}/mensajes/justificante/${id}/file/`;
+      return `/api/users/mensajes/justificante/${id}/file/`;
     case 'gasto':
-      return `${API_BASE}/gastos/${id}/file/`;
+      return `/api/users/gastos/${id}/file/`;
     default:
-      throw new Error(`Unknown file category: ${category}`);
+      throw new Error(`Categoría de archivo desconocida: ${category}`);
   }
 }
 
@@ -62,14 +62,23 @@ export default function useFilePreview() {
       category: FileCategory,
       expenseInfo?: ExpenseInfo
     ) => {
+      if (!token) {
+        console.error('❌ No hay token de autenticación');
+        return;
+      }
+
       setIsLoading(true);
+      
       try {
-        const url = buildFileUrl(category, id);
-        const response = await fetch(url, {
+        const endpoint = buildFilePath(category, id);
+        
+        const response = await apiFetch(endpoint, {
           method: 'GET',
-          headers: { Authorization: `Token ${token}` },
-        });
-        if (!response.ok) throw new Error('Archivo no encontrado');
+        }, true);
+        
+        if (!response.ok) {
+          throw new Error('Archivo no encontrado');
+        }
 
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
@@ -83,7 +92,7 @@ export default function useFilePreview() {
           expenseInfo,
         });
       } catch (error) {
-        console.error(error);
+        console.error('❌ Error al cargar el archivo:', error);
         alert('No se pudo cargar el archivo');
       } finally {
         setIsLoading(false);

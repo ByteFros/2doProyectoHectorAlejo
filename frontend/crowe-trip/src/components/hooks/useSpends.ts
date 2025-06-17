@@ -1,5 +1,6 @@
 // hooks/useSpends.ts
 import { useState, useEffect } from "react";
+import { apiFetch } from "~/utils/api"; // Ajusta si tu path es distinto
 import useAuth from "./use-auth";
 
 export interface Gasto {
@@ -19,13 +20,11 @@ export interface Gasto {
 }
 
 export interface NuevoGasto {
-  concepto: string;
-  monto: number;
+  concept: string;
+  amount: number;
+  receipt?: File;
   viaje_id: number;
-  comprobante?: File;
 }
-
-const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 export default function useSpends(currentTripId?: number) {
   const { token } = useAuth();
@@ -43,13 +42,7 @@ export default function useSpends(currentTripId?: number) {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/users/gastos/`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Token ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await apiFetch("/api/users/gastos/", {}, true);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -58,37 +51,22 @@ export default function useSpends(currentTripId?: number) {
 
       const data = await response.json();
       setGastos(data);
-
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";
       setError(message);
-      console.error("Error al obtener gastos:", message);
+      console.error("❌ Error al obtener gastos:", message);
     } finally {
       setLoading(false);
     }
   };
 
-  const crearGasto = async (gastoData: {
-    concept: string;
-    amount: number;
-    receipt?: File;
-    viaje_id: number;
-  }) => {
+  const crearGasto = async (gastoData: NuevoGasto) => {
     if (!token) return { success: false, error: "No autenticado" };
     if (!gastoData.viaje_id) return { success: false, error: "Debes declarar el id del viaje" };
-
     if (!gastoData.concept.trim()) return { success: false, error: "El concepto es requerido" };
     if (isNaN(gastoData.amount) || gastoData.amount <= 0)
       return { success: false, error: "El monto debe ser un número positivo" };
-
-    console.log("📦 Enviando gasto:", {
-      concepto: gastoData.concept,
-      monto: gastoData.amount,
-      viaje_id: gastoData.viaje_id,
-      comprobante: gastoData.receipt,
-    });
-    
 
     setLoading(true);
     setError(null);
@@ -102,13 +80,14 @@ export default function useSpends(currentTripId?: number) {
         formData.append("comprobante", gastoData.receipt);
       }
 
-      const response = await fetch(`${API_BASE_URL}/users/gastos/new/`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Token ${token}`,
+      const response = await apiFetch(
+        "/api/users/gastos/new/",
+        {
+          method: "POST",
+          body: formData,
         },
-        body: formData,
-      });
+        true // token incluído automáticamente
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -121,7 +100,7 @@ export default function useSpends(currentTripId?: number) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error desconocido";
       setError(message);
-      console.error("Error al crear gasto:", message);
+      console.error("❌ Error al crear gasto:", message);
       return { success: false, error: message };
     } finally {
       setLoading(false);

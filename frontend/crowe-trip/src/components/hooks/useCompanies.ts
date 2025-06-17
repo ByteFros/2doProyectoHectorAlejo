@@ -1,5 +1,6 @@
 // hooks/useCompanies.ts
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '~/utils/api'; // Ajusta si cambia la ruta
 import useAuth from './use-auth';
 
 export interface Empresa {
@@ -22,16 +23,10 @@ export default function useCompanies() {
     setError(null);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/users/empresas/', {
-        headers: {
-          Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await apiFetch('/api/users/empresas/', {}, true);
+      if (!response.ok) throw new Error('Error al cargar empresas');
 
-      if (!res.ok) throw new Error('Error al cargar empresas');
-
-      const data = await res.json();
+      const data = await response.json();
       const formatted = data.map((e: any) => ({
         id: e.id,
         nombre: e.nombre_empresa,
@@ -54,33 +49,25 @@ export default function useCompanies() {
 
   const deleteCompany = async (id: number) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/users/empresas/${id}/`, {
+      const response = await apiFetch(`/api/users/empresas/${id}/`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      }, true);
 
-      if (!res.ok) throw new Error('Error al eliminar empresa');
+      if (!response.ok) throw new Error('Error al eliminar empresa');
       setCompanies((prev) => prev.filter((emp) => emp.id !== id));
     } catch (err: any) {
-      console.error(err);
+      console.error('❌ Error al eliminar empresa:', err);
     }
   };
 
   const toggleAutogestion = async (id: number, current: boolean) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/users/empresas/${id}/`, {
+      const response = await apiFetch(`/api/users/empresas/${id}/`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Token ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ permisos: !current }),
-      });
+      }, true);
 
-      if (!res.ok) throw new Error('Error al actualizar permisos');
+      if (!response.ok) throw new Error('Error al actualizar permisos');
 
       setCompanies((prev) =>
         prev.map((emp) =>
@@ -88,9 +75,16 @@ export default function useCompanies() {
         )
       );
     } catch (err: any) {
-      console.error(err);
+      console.error('❌ Error al cambiar autogestión:', err);
     }
   };
 
-  return { companies, loading, error, deleteCompany, toggleAutogestion, refetch: fetchCompanies };
+  return {
+    companies,
+    loading,
+    error,
+    deleteCompany,
+    toggleAutogestion,
+    refetch: fetchCompanies,
+  };
 }
