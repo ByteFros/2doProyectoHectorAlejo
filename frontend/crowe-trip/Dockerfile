@@ -1,20 +1,29 @@
-# Usar Node.js con glibc en lugar de Alpine
-FROM node:20-slim
-
-# Establecer directorio de trabajo
+# Build stage
+FROM node:20-slim AS builder
 WORKDIR /app
 
-# Copiar archivos de configuración
 COPY package.json package-lock.json* ./
-
-# Instalar dependencias
 RUN npm ci
 
-# Copiar el resto del código
 COPY . .
+RUN npm run build
 
-# Exponer puerto 5173 (puerto predeterminado de Vite/Remix Dev Server)
+# Production stage
+FROM node:20-slim
+WORKDIR /app
+
+# Copiar archivos de configuración e instalar dependencias de producción
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+# Copiar archivos construidos
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/public ./public
+
 EXPOSE 5173
+ENV NODE_ENV=production
+ENV PORT=5173
+ENV HOST=0.0.0.0
 
-# Comando para iniciar la aplicación en modo desarrollo
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Usar el script definido en package.json
+CMD ["npm", "start"]

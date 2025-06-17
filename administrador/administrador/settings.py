@@ -160,6 +160,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://crowe:5173",              # Nombre del servicio en Docker
     "http://212.227.57.91:5173",      # IP pública
+    "https://crowe.bronixia.es"
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # ✅ Permitir envío de cookies
@@ -168,7 +169,7 @@ CSRF_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_SAMESITE = "None"  # ✅ Permitir cookies cross-site
 
 CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = False  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
+SESSION_COOKIE_SECURE = True  # ✅ Requerir HTTPS (desactiva esto si pruebas localmente)
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
