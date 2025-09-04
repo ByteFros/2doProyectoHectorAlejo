@@ -73,7 +73,7 @@ export default function useAuth() {
 
     // 🔁 Redirección automática según rol
     useEffect(() => {
-        if (role && token) {
+        if (role && token && hasCheckedSession) {
             const roleToPath: Record<string, string> = {
                 MASTER: "/master",
                 EMPRESA: "/company",
@@ -81,12 +81,15 @@ export default function useAuth() {
             };
 
             const path = roleToPath[role];
-            if (path && window.location.pathname !== path) {
+            const currentPath = window.location.pathname;
+            
+            // Solo redirigir si no estamos ya en la página correcta y no estamos en login
+            if (path && currentPath !== path && (currentPath === "/" || currentPath === "/login")) {
                 console.log("🔁 Redirigiendo automáticamente a:", path);
-                navigate(path);
+                navigate(path, { replace: true });
             }
         }
-    }, [role, token, navigate]);
+    }, [role, token, navigate, hasCheckedSession]);
 
     const login = async (username: string, password: string) => {
         try {
@@ -100,12 +103,14 @@ export default function useAuth() {
             const data = await response.json();
 
             if (data.token) {
+                // Actualizar todos los estados de una vez para evitar renders parciales
                 setToken(data.token);
                 setUsername(username);
                 setRole(data.role);
                 setUserId(data.user_id);
                 setMustChangePassword(!!data.must_change_password);
 
+                // Persistir datos inmediatamente
                 localStorage.setItem("token", data.token);
                 localStorage.setItem("userId", data.user_id.toString());
 
@@ -122,6 +127,11 @@ export default function useAuth() {
                     setEmpleadoId(data.empleado_id);
                     localStorage.setItem("empleadoId", data.empleado_id.toString());
                 }
+
+                console.log("✅ Login exitoso, datos establecidos:", { 
+                    role: data.role, 
+                    userId: data.user_id 
+                });
 
                 return true;
             }

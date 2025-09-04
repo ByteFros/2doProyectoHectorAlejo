@@ -30,22 +30,7 @@ export default function LoginForm() {
     }, []);
 
 
-    useEffect(() => {
-        if (role) {
-            const roleToPath: Record<string, string> = {
-                MASTER: "/master",  // 🔥 Corregimos los nombres de los roles
-                EMPRESA: "/company",
-                EMPLEADO: "/employee",
-            };
-
-            if (roleToPath[role]) {
-                console.log("✅ Redirigiendo a:", roleToPath[role]); // 🔥 Depuración
-                navigate(roleToPath[role]);
-            } else {
-                console.error("⚠️ Error: Role no reconocido:", role);
-            }
-        }
-    }, [role, navigate]);
+    // Redireccionamiento manejado por use-auth hook
 
     return showRecovery ? (
         <PasswordRecovery onBack={() => setShowRecovery(false)} />
