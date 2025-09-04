@@ -66,21 +66,12 @@ export default function useFilePreview() {
       setIsLoading(true);
       try {
         const url = buildFileUrl(category, id);
-        console.log('🔧 [useFilePreview] Opening file preview:');
-        console.log('🔧 [useFilePreview] ID:', id);
-        console.log('🔧 [useFilePreview] Category:', category);
-        console.log('🔧 [useFilePreview] Built URL:', url);
-        
         const response = await fetch(url, {
           method: 'GET',
           headers: { Authorization: `Token ${token}` },
         });
         
-        console.log('🔧 [useFilePreview] Response status:', response.status);
-        console.log('🔧 [useFilePreview] Response headers:', [...response.headers.entries()]);
-        
         if (!response.ok) {
-          console.error('🔧 [useFilePreview] Response not OK, throwing error');
           throw new Error('Archivo no encontrado');
         }
 

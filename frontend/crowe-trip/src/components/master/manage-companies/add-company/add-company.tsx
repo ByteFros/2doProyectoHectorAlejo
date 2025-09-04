@@ -61,8 +61,6 @@ export default function AddCompany({ onAddCompany }: Props) {
     console.log('🔧 [AddCompany] JSON stringify:', JSON.stringify(requestData));
 
     try {
-      console.log('🔧 [AddCompany] Using fixed apiRequest...');
-      
       const res = await apiRequest("/users/empresas/new/", {
         method: "POST",
         headers: {

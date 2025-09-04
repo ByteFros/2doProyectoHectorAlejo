@@ -39,14 +39,17 @@ export default function CurrentTrip() {
     // Cargar viaje actual
     useEffect(() => {
         const loadCurrentTrip = async () => {
+            console.log('🔧 [CurrentTrip] loadCurrentTrip called, token:', !!token);
             if (token) {
                 setIsLoading(true);
-                await getViajeEnCurso();
+                console.log('🔧 [CurrentTrip] Calling getViajeEnCurso...');
+                const result = await getViajeEnCurso();
+                console.log('🔧 [CurrentTrip] getViajeEnCurso result:', result);
                 setIsLoading(false);
             }
         };
         loadCurrentTrip();
-    }, [token]);
+    }, [token, getViajeEnCurso]); // Añadir getViajeEnCurso como dependencia
 
     // Finalizar viaje
     const handleEndTrip = async () => {

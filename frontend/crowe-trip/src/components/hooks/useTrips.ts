@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import useAuth from "./use-auth";
 import { Trip, Expense, Weather } from "./types";
 import { getWeather } from "../../utils/web";
@@ -54,25 +54,48 @@ export default function useTrips() {
         setExpenses(storedExpenses);
     }, []);
 
-    const getViajeEnCurso = async () => {
-        if (!token) return null;
+    const fetchAndSetWeather = useCallback(async (city: string) => {
+        const data = await getWeather(city);
+        setWeather(data);
+    }, []);
+
+    const getViajeEnCurso = useCallback(async () => {
+        console.log('🔧 [useTrips] getViajeEnCurso called');
+        console.log('🔧 [useTrips] Token:', token);
+        
+        if (!token) {
+            console.log('🔧 [useTrips] No token, returning null');
+            return null;
+        }
+        
         try {
+            console.log('🔧 [useTrips] Making request to /users/viajes/en-curso/');
+            
             const res = await apiRequest("/users/viajes/en-curso/", {
                 method: "GET",
                 headers: {
                     Authorization: `Token ${token}`,
                 },
             });
+            
+            console.log('🔧 [useTrips] Response status:', res.status);
+            console.log('🔧 [useTrips] Response headers:', [...res.headers.entries()]);
 
             if (res.status === 204) {
+                console.log('🔧 [useTrips] No viaje en curso (204)');
                 setCurrentTrip(null);
                 setWeather(null);
                 return null;
             }
 
-            if (!res.ok) throw new Error("Error al obtener el viaje en curso");
+            if (!res.ok) {
+                const errorText = await res.text();
+                console.error('🔧 [useTrips] Response not OK:', errorText);
+                throw new Error("Error al obtener el viaje en curso");
+            }
 
             const viaje = await res.json();
+            console.log('🔧 [useTrips] Viaje data received:', viaje);
 
             const formattedTrip: Trip = {
                 id: viaje.id,
@@ -82,20 +105,17 @@ export default function useTrips() {
                 reason: viaje.motivo,
                 startDate: viaje.fecha_inicio,
             };
+            
+            console.log('🔧 [useTrips] Formatted trip:', formattedTrip);
 
             setCurrentTrip(formattedTrip);
             fetchAndSetWeather(formattedTrip.city);
             return formattedTrip;
         } catch (err) {
-            console.error("Error al cargar viaje en curso:", err);
+            console.error("🔧 [useTrips] Error al cargar viaje en curso:", err);
             return null;
         }
-    };
-
-    const fetchAndSetWeather = async (city: string) => {
-        const data = await getWeather(city);
-        setWeather(data);
-    };
+    }, [token, fetchAndSetWeather]); // Depende del token y fetchAndSetWeather
 
     const finalizarViaje = async (viajeId: number) => {
         if (!token) return { error: "No autenticado" };
