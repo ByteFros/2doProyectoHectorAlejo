@@ -27,7 +27,7 @@ services:
       - db
     command: sh -c "python manage.py migrate &&
       python manage.py create_master_user &&
-      python manage.py runserver 0.0.0.0:8000"
+      python manage.py runserver 127.0.0.1:9000"
 
 volumes:
   postgres_data:

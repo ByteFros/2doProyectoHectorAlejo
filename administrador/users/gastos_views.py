@@ -30,12 +30,12 @@ class CrearGastoView(APIView):
             data["empleado_id"] = empleado.id
             data["empresa_id"] = empleado.empresa.id
 
-            # 🔥 Verificar que el viaje existe y está en el estado correcto
+            # 🔥 Verificar que el viaje existe y no está cancelado
             viaje_id = data.get("viaje_id")
             try:
                 viaje = Viaje.objects.get(id=viaje_id)
-                if viaje.estado not in ["EN_CURSO", "FINALIZADO"]:
-                    return Response({"error": "Solo puedes registrar gastos en viajes en curso o finalizados"},
+                if viaje.estado == "CANCELADO":
+                    return Response({"error": "No puedes registrar gastos en viajes cancelados"},
                                     status=400)
             except Viaje.DoesNotExist:
                 return Response({"error": "El viaje no existe"}, status=404)

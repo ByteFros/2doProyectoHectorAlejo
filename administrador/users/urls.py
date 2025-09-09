@@ -5,7 +5,8 @@ from .dias_views import DiaViajeListView, DiaViajeUpdateView
 from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
     RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView, PendingCompaniesView, \
     PendingEmployeesByCompanyView
-from .export_views import ExportMasterCSVView, ExportEmpresaCSVView
+from .export_views import ExportMasterCSVView, ExportEmpresaCSVView, ExportViajesGastosView, ExportEmpleadoIndividualView
+from .export_zip_views import ExportViajesGastosZipView, ExportEmpleadoIndividualZipView
 from .gastos_views import CrearGastoView, AprobarRechazarGastoView, GastoListView, GastoUpdateDeleteView, \
     GastoComprobanteDownloadView
 from .messages_views import SolicitarJustificanteView, ListarMensajesView, ResponderMensajeView, \
@@ -113,6 +114,10 @@ urlpatterns = [
     #exports
     path('export/viajes/exportar/', ExportMasterCSVView.as_view()),
     path('export/empresa/viajes/exportar/', ExportEmpresaCSVView.as_view()),
+    path('export/viajes-gastos/', ExportViajesGastosView.as_view(), name='export_viajes_gastos'),
+    path('export/empleado/<int:empleado_id>/viajes-gastos/', ExportEmpleadoIndividualView.as_view(), name='export_empleado_individual'),
+    path('export/viajes-gastos-zip/', ExportViajesGastosZipView.as_view(), name='export_viajes_gastos_zip'),
+    path('export/empleado/<int:empleado_id>/viajes-gastos-zip/', ExportEmpleadoIndividualZipView.as_view(), name='export_empleado_individual_zip'),
 
 
 ]

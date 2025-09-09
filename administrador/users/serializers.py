@@ -257,8 +257,8 @@ class ViajeSerializer(serializers.ModelSerializer):
 
 """2do serializer para manejar viajes y cálculo automático de días con destino y país"""
 class ViajeSerializer(serializers.ModelSerializer):
-    empleado_id = serializers.IntegerField(write_only=True)
-    empresa_id = serializers.IntegerField(write_only=True)
+    empleado_id = serializers.IntegerField(write_only=True, required=False)
+    empresa_id = serializers.IntegerField(write_only=True, required=False)
     empleado = EmpleadoProfileSerializer(read_only=True)
     empresa = EmpresaProfileSerializer(read_only=True)
     destino = serializers.CharField()
@@ -285,9 +285,16 @@ class ViajeSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        # 1) Sacamos los IDs
-        empleado = EmpleadoProfile.objects.get(id=validated_data.pop('empleado_id'))
-        empresa = EmpresaProfile.objects.get(id=validated_data.pop('empresa_id'))
+        # 1) Sacamos los IDs (si están presentes, sino serán asignados por la vista)
+        empleado_id = validated_data.pop('empleado_id', None)
+        empresa_id = validated_data.pop('empresa_id', None)
+        
+        if empleado_id and empresa_id:
+            empleado = EmpleadoProfile.objects.get(id=empleado_id)
+            empresa = EmpresaProfile.objects.get(id=empresa_id)
+        else:
+            # Los IDs serán asignados por la vista antes de llegar aquí
+            raise serializers.ValidationError("empleado_id y empresa_id son requeridos")
 
         # 2) Sacamos y eliminamos destino de validated_data
         destino = validated_data.pop('destino', '').strip()

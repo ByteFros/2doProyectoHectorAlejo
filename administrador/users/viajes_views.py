@@ -1,3 +1,4 @@
+import logging
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
@@ -10,6 +11,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework import status
 from datetime import datetime, date, timedelta
 from .serializers import ViajeSerializer, DiaViajeSerializer, PendingTripSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class CrearViajeView(APIView):
@@ -44,7 +47,19 @@ class CrearViajeView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
 
             # 🔁 Determinar estado inicial del viaje
-            data["estado"] = "EN_CURSO" if fecha_inicio == date.today() else "PENDIENTE"
+            hoy = date.today()
+            if fecha_fin < hoy:
+                # Viaje ya terminó (fechas pasadas)
+                data["estado"] = "FINALIZADO"
+            elif fecha_inicio == hoy:
+                # Viaje comienza hoy
+                data["estado"] = "EN_CURSO"
+            elif fecha_inicio > hoy:
+                # Viaje futuro
+                data["estado"] = "PENDIENTE"
+            else:
+                # Viaje comenzó en el pasado pero aún no terminó
+                data["estado"] = "EN_CURSO"
 
             # 🔍 Verificar conflicto con otros viajes
             conflicto_viajes = Viaje.objects.filter(
@@ -310,13 +325,13 @@ class ListarViajesFinalizadosView(APIView):
 
         # 🔹 MASTER: ve todos los viajes finalizados
         if user.role == "MASTER":
-            viajes = Viaje.objects.filter(estado="FINALIZADO")
+            viajes = Viaje.objects.filter(estado="FINALIZADO").exclude(estado="CANCELADO")
 
         # 🔹 EMPRESA: ve los viajes de sus empleados
         elif user.role == "EMPRESA":
             try:
                 empresa = EmpresaProfile.objects.get(user=user)
-                viajes = Viaje.objects.filter(empleado__empresa=empresa, estado="FINALIZADO")
+                viajes = Viaje.objects.filter(empleado__empresa=empresa, estado="FINALIZADO").exclude(estado="CANCELADO")
             except EmpresaProfile.DoesNotExist:
                 return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
 
@@ -324,7 +339,7 @@ class ListarViajesFinalizadosView(APIView):
         elif user.role == "EMPLEADO":
             try:
                 empleado = EmpleadoProfile.objects.get(user=user)
-                viajes = Viaje.objects.filter(empleado=empleado, estado="FINALIZADO")
+                viajes = Viaje.objects.filter(empleado=empleado, estado="FINALIZADO").exclude(estado="CANCELADO")
             except EmpleadoProfile.DoesNotExist:
                 return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
 
@@ -362,7 +377,7 @@ class PendingTripsByEmployeeView(APIView):
         # MASTER pasa sin restricciones
 
         # --- Lectura de los viajes en revisión ---
-        viajes = Viaje.objects.filter(empleado=empleado, estado='EN_REVISION')
+        viajes = Viaje.objects.filter(empleado=empleado, estado='EN_REVISION').exclude(estado='CANCELADO')
         serializer = PendingTripSerializer(viajes, many=True)
         return Response(serializer.data, status=200)
 
@@ -376,19 +391,19 @@ class ListarTodosLosViajesView(APIView):
         user = request.user
 
         if user.role == "MASTER":
-            viajes = Viaje.objects.all()
+            viajes = Viaje.objects.exclude(estado="CANCELADO")
 
         elif user.role == "EMPRESA":
             try:
                 empresa = EmpresaProfile.objects.get(user=user)
-                viajes = Viaje.objects.filter(empleado__empresa=empresa)
+                viajes = Viaje.objects.filter(empleado__empresa=empresa).exclude(estado="CANCELADO")
             except EmpresaProfile.DoesNotExist:
                 return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
 
         elif user.role == "EMPLEADO":
             try:
                 empleado = EmpleadoProfile.objects.get(user=user)
-                viajes = Viaje.objects.filter(empleado=empleado)
+                viajes = Viaje.objects.filter(empleado=empleado).exclude(estado="CANCELADO")
             except EmpleadoProfile.DoesNotExist:
                 return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
 
@@ -415,18 +430,18 @@ class PendingTripsDetailView(APIView):
             # Sólo EMPRESA/MASTER pueden filtrar otros; EMPLEADO sólo el suyo
             if user.role == "EMPLEADO" and int(empleado_id) != user.empleado_profile.id:
                 return Response({"error": "No autorizado"}, status=403)
-            viajes_qs = Viaje.objects.filter(empleado_id=empleado_id, estado="EN_REVISION")
+            viajes_qs = Viaje.objects.filter(empleado_id=empleado_id, estado="EN_REVISION").exclude(estado="CANCELADO")
 
         else:
             # Sin filtro, cae en la lógica global
             if user.role == "MASTER":
-                viajes_qs = Viaje.objects.filter(estado="EN_REVISION")
+                viajes_qs = Viaje.objects.filter(estado="EN_REVISION").exclude(estado="CANCELADO")
             elif user.role == "EMPRESA":
                 empresa = get_object_or_404(EmpresaProfile, user=user)
-                viajes_qs = Viaje.objects.filter(empleado__empresa=empresa, estado="EN_REVISION")
+                viajes_qs = Viaje.objects.filter(empleado__empresa=empresa, estado="EN_REVISION").exclude(estado="CANCELADO")
             else:  # EMPLEADO
                 empleado = get_object_or_404(EmpleadoProfile, user=user)
-                viajes_qs = Viaje.objects.filter(empleado=empleado, estado="EN_REVISION")
+                viajes_qs = Viaje.objects.filter(empleado=empleado, estado="EN_REVISION").exclude(estado="CANCELADO")
 
         serializer = PendingTripSerializer(viajes_qs, many=True)
         return Response({
@@ -516,7 +531,7 @@ class EmployeeCityStatsView(APIView):
             return Response({"error": "Perfil de empleado no encontrado"}, status=404)
 
         # Traer todos los viajes finalizados del empleado
-        viajes = Viaje.objects.filter(empleado=empleado, estado='FINALIZADO')
+        viajes = Viaje.objects.filter(empleado=empleado, estado='FINALIZADO').exclude(estado='CANCELADO')
 
         # Agrupación manual por ciudad
         city_stats = {}
