@@ -19,8 +19,9 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
     nombre_empresa = serializers.CharField(required=False)
     nif = serializers.CharField(required=False)
-    pais = serializers.CharField(required=False)
-    codigo_postal = serializers.CharField(required=False)
+    address = serializers.CharField(required=False)
+    city = serializers.CharField(required=False)
+    postal_code = serializers.CharField(required=False)
     correo_contacto = serializers.EmailField(required=False)
 
     nombre = serializers.CharField(required=False)
@@ -30,7 +31,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'email', 'role', 'password',
-                  'nombre_empresa', 'nif', 'pais', 'codigo_postal', 'correo_contacto',
+                  'nombre_empresa', 'nif', 'address', 'city', 'postal_code', 'correo_contacto',
                   'nombre', 'apellido', 'empresa_id']
         extra_kwargs = {'password': {'write_only': True}}
 
@@ -56,8 +57,9 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                 user=user,
                 nombre_empresa=validated_data['nombre_empresa'],
                 nif=nif,
-                pais=validated_data['pais'],
-                codigo_postal=validated_data['codigo_postal'],
+                address=validated_data.get('address', ''),
+                city=validated_data.get('city', ''),
+                postal_code=validated_data.get('postal_code', ''),
                 correo_contacto=validated_data['correo_contacto']
             )
 
