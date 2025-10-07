@@ -1,6 +1,5 @@
-from django.urls import path
+from django.urls import path, include
 
-from .auth_views import LoginView, LogoutView, RegisterUserView, SessionView
 from .dias_views import DiaViajeListView, DiaViajeUpdateView
 from .empresa_views import EliminarEmpleadoView, RegisterEmpresaView, \
     RegisterEmployeeView, BatchRegisterEmployeesView, EmpresaManagementView, PendingCompaniesView, \
@@ -19,19 +18,19 @@ from .report_views import CompanyTripsSummaryView, TripsPerMonthView, TripsTypeV
 from .viajes_views import CrearViajeView, AprobarRechazarViajeView, FinalizarViajeView, IniciarViajeView, \
     ListarViajesFinalizadosView, ListarTodosLosViajesView, CancelarViajeView, ViajeEnCursoView, \
     PendingTripsByEmployeeView, PendingTripsDetailView, FinalizarRevisionViajeView, EmployeeCityStatsView
-from .views import UserDetailView, EmployeeListView, PasswordResetRequestView, \
-    PasswordResetConfirmView, ChangePasswordView, EmpleadosPorEmpresaView
+from .views import UserDetailView, EmployeeListView, EmpleadosPorEmpresaView
 
 urlpatterns = [
-    # Autenticación
-    path('register/', RegisterUserView.as_view(), name='register'),
+    # Autenticación - Módulo dedicado
+    path('', include('users.authentication.urls')),
+
+    # Empresas
     path('empresas/new/', RegisterEmpresaView.as_view(), name='crear_empresa'),
     path('empresas/test-json/', RegisterEmpresaView.as_view(), name='crear_empresa_test'),  # Test URL
+
+    # Empleados
     path('empleados/nuevo/', RegisterEmployeeView.as_view(), name='registrar_empleado'),
     path("empleados/batch-upload/", BatchRegisterEmployeesView.as_view(), name="batch_register_employees"),
-    path('login/', LoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(), name='logout'),
-    path('session/', SessionView.as_view(), name='session'),
 
     # Usuarios y empresas
     path('profile/', UserDetailView.as_view(), name='profile'),
@@ -74,10 +73,8 @@ urlpatterns = [
 
 
 
-    # Contraseña
-    path("password-reset-request/", PasswordResetRequestView.as_view(), name="password_reset"),
-    path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
-    path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    # Contraseñas - Módulo dedicado
+    path('', include('users.password.urls')),
 
     # notificaciones
     path("notificaciones/", ListaNotificacionesView.as_view(), name="lista_notificaciones"),
