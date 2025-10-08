@@ -64,7 +64,7 @@ class EmpleadoProfile(models.Model):
     empresa = models.ForeignKey(EmpresaProfile, on_delete=models.CASCADE, related_name="empleados", null=False)
     nombre = models.CharField(max_length=255)
     apellido = models.CharField(max_length=255)
-    dni = models.CharField(max_length=20, unique=True, default="PENDIENTE")  # 🔹 DNI único
+    dni = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)  # 🔹 DNI único opcional
 
     def clean(self):
         """Un empleado no puede pertenecer a más de una empresa"""

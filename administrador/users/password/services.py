@@ -1,6 +1,7 @@
 """
 Servicios de lógica de negocio para gestión de contraseñas
 """
+from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
@@ -35,10 +36,15 @@ def send_password_reset_email(user, token, frontend_url="http://localhost:5173")
     reset_link = f"{frontend_url}/reset-password/?token={token.token}"
 
     try:
+        print(
+            f"[PasswordReset] Enviando correo a {user.email} "
+            f"(from {getattr(settings, 'DEFAULT_FROM_EMAIL', settings.EMAIL_HOST_USER)}, "
+            f"host {settings.EMAIL_HOST}:{settings.EMAIL_PORT})"
+        )
         send_mail(
             subject="Restablecimiento de contraseña",
             message=f"Usa este enlace para restablecer tu contraseña: {reset_link}",
-            from_email="soporte@tuempresa.com",
+            from_email=getattr(settings, "DEFAULT_FROM_EMAIL", settings.EMAIL_HOST_USER),
             recipient_list=[user.email],
             fail_silently=False,
         )

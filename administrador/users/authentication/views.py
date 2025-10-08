@@ -17,6 +17,7 @@ class LoginView(APIView):
     """
     Autentica un usuario y devuelve su token y datos de perfil.
     """
+    authentication_classes = [TokenAuthentication]
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -61,6 +62,7 @@ class RegisterUserView(APIView):
     """
     Registra un nuevo usuario con perfil de empresa o empleado.
     """
+    authentication_classes = [TokenAuthentication]
     permission_classes = [AllowAny]
 
     def post(self, request):

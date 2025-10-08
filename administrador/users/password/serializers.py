@@ -18,6 +18,20 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         write_only=True,
         help_text="Mínimo 8 caracteres"
     )
+    confirm_password = serializers.CharField(
+        required=True,
+        min_length=8,
+        write_only=True,
+        help_text="Debe coincidir con la nueva contraseña"
+    )
+
+    def validate(self, data):
+        confirm_password = data.pop('confirm_password')
+        if data['new_password'] != confirm_password:
+            raise serializers.ValidationError({
+                "confirm_password": "Las contraseñas no coinciden."
+            })
+        return data
 
 
 class ChangePasswordSerializer(serializers.Serializer):

@@ -15,7 +15,9 @@ from .views import (
     ListarTodosLosViajesView,
     PendingTripsDetailView,
     FinalizarRevisionViajeView,
-    EmployeeCityStatsView
+    EmployeeCityStatsView,
+    DiaViajeListView,
+    DiaViajeUpdateView
 )
 
 urlpatterns = [
@@ -41,4 +43,8 @@ urlpatterns = [
     # Verificación y estadísticas
     path('empleados/viaje-en-curso/', VerificarViajeEnCursoView.as_view(), name='verificar_viaje_en_curso'),
     path('empleados/ciudades/', EmployeeCityStatsView.as_view(), name='employee_city_stats'),
+
+    # Gestión de días de viaje
+    path('viajes/<int:viaje_id>/dias/', DiaViajeListView.as_view(), name='dias-list'),
+    path('viajes/<int:viaje_id>/dias/<int:dia_id>/', DiaViajeUpdateView.as_view(), name='dias-update'),
 ]

@@ -1,29 +1,42 @@
-# views/report_views.py
-from django.db.models.functions import TruncMonth
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authentication import TokenAuthentication
+"""
+Vistas para reportes y analytics de viajes
+"""
 from django.db.models import (
-    OuterRef, Subquery,
-    Count, Sum, IntegerField, Value, Q
+    OuterRef, Subquery, Count, Sum, IntegerField, Value, Q
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncMonth
+from django.shortcuts import get_object_or_404
+from rest_framework import status
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import EmpresaProfile, Viaje, DiaViaje, EmpleadoProfile
-from .serializers import CompanyTripsSummarySerializer, TripsPerMonthSerializer, TripsTypeSerializer, \
-    ExemptDaysSerializer, GeneralInfoSerializer
+from users.models import EmpresaProfile, Viaje, DiaViaje, EmpleadoProfile
+from users.serializers import (
+    CompanyTripsSummarySerializer,
+    TripsPerMonthSerializer,
+    TripsTypeSerializer,
+    ExemptDaysSerializer,
+    GeneralInfoSerializer
+)
+from users.common.services import get_user_empresa, get_user_empleado
+from users.common.exceptions import (
+    EmpresaProfileNotFoundError,
+    EmpleadoProfileNotFoundError,
+    UnauthorizedAccessError
+)
 
 
 class CompanyTripsSummaryView(APIView):
-    """Devuelve resumen de viajes por empresa: viajes, días y días no exentos."""
+    """Devuelve resumen de viajes por empresa: viajes, días y días no exentos"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Sólo MASTER o EMPRESA
+        # Solo MASTER o EMPRESA
         if request.user.role not in ('MASTER', 'EMPRESA'):
-            return Response({'error': 'No autorizado'}, status=403)
+            raise UnauthorizedAccessError("No autorizado para ver resúmenes de empresas")
 
         # Base de viajes FINALIZADOS por empresa
         viajes = Viaje.objects.filter(
@@ -63,7 +76,6 @@ class CompanyTripsSummaryView(APIView):
             .values('count')
         )
 
-
         # Annotate la QS principal
         qs = EmpresaProfile.objects.annotate(
             trips=Coalesce(
@@ -82,7 +94,7 @@ class CompanyTripsSummaryView(APIView):
 
         # Serializar la respuesta
         data = [{
-            'empresa_id': e.id,  # ✅ Correcto
+            'empresa_id': e.id,
             'empresa': e.nombre_empresa,
             'trips': e.trips,
             'days': e.days,
@@ -90,11 +102,11 @@ class CompanyTripsSummaryView(APIView):
         } for e in qs]
 
         serializer = CompanyTripsSummarySerializer(data, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TripsPerMonthView(APIView):
-    """Total de días viajados por mes (solo FINALIZADOS), filtrado según el rol."""
+    """Total de días viajados por mes (solo FINALIZADOS), filtrado según el rol"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -102,23 +114,21 @@ class TripsPerMonthView(APIView):
         user = request.user
         viajes = Viaje.objects.filter(estado='FINALIZADO')
 
-        # 🔹 Filtrado por rol
+        # Filtrado por rol
         if user.role == "EMPRESA":
-            try:
-                empresa = EmpresaProfile.objects.get(user=user)
-                viajes = viajes.filter(empleado__empresa=empresa)
-            except EmpresaProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
+            empresa = get_user_empresa(user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
+            viajes = viajes.filter(empleado__empresa=empresa)
 
         elif user.role == "EMPLEADO":
-            try:
-                empleado = EmpleadoProfile.objects.get(user=user)
-                viajes = viajes.filter(empleado=empleado)
-            except EmpleadoProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
+            viajes = viajes.filter(empleado=empleado)
 
         elif user.role != "MASTER":
-            return Response({"error": "Rol de usuario no reconocido"}, status=403)
+            raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
         # Agrupación por mes y suma de días
         viajes = (
@@ -128,16 +138,16 @@ class TripsPerMonthView(APIView):
             .order_by('month')
         )
 
-        # Serialización de los datos (sin usar serializer ya que es simple)
+        # Serialización de los datos
         data = [
             {'month': v['month'].strftime('%Y-%m'), 'totalDays': v['totalDays'] or 0}
             for v in viajes
         ]
-        return Response(data, status=200)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class TripsTypeView(APIView):
-    """Devuelve el conteo de viajes nacionales vs internacionales, filtrado por rol."""
+    """Devuelve el conteo de viajes nacionales vs internacionales, filtrado por rol"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -147,23 +157,21 @@ class TripsTypeView(APIView):
         # Base queryset
         viajes = Viaje.objects.filter(estado='FINALIZADO')
 
-        # 🔹 Filtrado por rol
+        # Filtrado por rol
         if user.role == "EMPRESA":
-            try:
-                empresa = EmpresaProfile.objects.get(user=user)
-                viajes = viajes.filter(empleado__empresa=empresa)
-            except EmpresaProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
+            empresa = get_user_empresa(user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
+            viajes = viajes.filter(empleado__empresa=empresa)
 
         elif user.role == "EMPLEADO":
-            try:
-                empleado = EmpleadoProfile.objects.get(user=user)
-                viajes = viajes.filter(empleado=empleado)
-            except EmpleadoProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
+            viajes = viajes.filter(empleado=empleado)
 
         elif user.role != "MASTER":
-            return Response({"error": "Rol de usuario no reconocido"}, status=403)
+            raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
         # Conteo nacional vs internacional
         national = viajes.filter(es_internacional=False).count()
@@ -180,11 +188,11 @@ class TripsTypeView(APIView):
         }
 
         serializer = TripsTypeSerializer(data)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class ExemptDaysView(APIView):
-    """Devuelve conteo de días exentos vs no exentos (viajes FINALIZADOS), filtrado por rol."""
+    """Devuelve conteo de días exentos vs no exentos (viajes FINALIZADOS), filtrado por rol"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -192,22 +200,21 @@ class ExemptDaysView(APIView):
         user = request.user
         qs = DiaViaje.objects.filter(viaje__estado='FINALIZADO')
 
+        # Filtrado por rol
         if user.role == "EMPRESA":
-            try:
-                empresa = EmpresaProfile.objects.get(user=user)
-                qs = qs.filter(viaje__empleado__empresa=empresa)
-            except EmpresaProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empresa asociado"}, status=403)
+            empresa = get_user_empresa(user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
+            qs = qs.filter(viaje__empleado__empresa=empresa)
 
         elif user.role == "EMPLEADO":
-            try:
-                empleado = EmpleadoProfile.objects.get(user=user)
-                qs = qs.filter(viaje__empleado=empleado)
-            except EmpleadoProfile.DoesNotExist:
-                return Response({"error": "No tienes un perfil de empleado asociado"}, status=403)
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
+            qs = qs.filter(viaje__empleado=empleado)
 
         elif user.role != "MASTER":
-            return Response({"error": "Rol de usuario no reconocido"}, status=403)
+            raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
         exempt_count = qs.filter(exento=True).count()
         non_exempt_count = qs.filter(exento=False).count()
@@ -218,12 +225,12 @@ class ExemptDaysView(APIView):
         }
 
         serializer = ExemptDaysSerializer(data)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class GeneralInfoView(APIView):
     """Devuelve totales de empresas, empleados y viajes nacionales/internacionales,
-       filtrados según el rol del usuario."""
+       filtrados según el rol del usuario"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -238,13 +245,9 @@ class GeneralInfoView(APIView):
 
         # EMPRESA: sólo su empresa
         elif user.role == "EMPRESA":
-            try:
-                empresa = EmpresaProfile.objects.get(user=user)
-            except EmpresaProfile.DoesNotExist:
-                return Response(
-                    {"error": "No tienes un perfil de empresa asociado"},
-                    status=403
-                )
+            empresa = get_user_empresa(user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
             companies = 1
             employees = EmpleadoProfile.objects.filter(empresa=empresa).count()
             viajes_qs = Viaje.objects.filter(
@@ -254,13 +257,9 @@ class GeneralInfoView(APIView):
 
         # EMPLEADO: sólo él
         elif user.role == "EMPLEADO":
-            try:
-                empleado = EmpleadoProfile.objects.get(user=user)
-            except EmpleadoProfile.DoesNotExist:
-                return Response(
-                    {"error": "No tienes un perfil de empleado asociado"},
-                    status=403
-                )
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
             companies = 1
             employees = 1
             viajes_qs = Viaje.objects.filter(
@@ -269,10 +268,7 @@ class GeneralInfoView(APIView):
             )
 
         else:
-            return Response(
-                {"error": "No autorizado"},
-                status=403
-            )
+            raise UnauthorizedAccessError("No autorizado")
 
         # Ahora contamos nacionales e internacionales
         national = viajes_qs.filter(es_internacional=False).count()
@@ -286,7 +282,7 @@ class GeneralInfoView(APIView):
         }
 
         serializer = GeneralInfoSerializer(data)
-        return Response(serializer.data, status=200)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class EmployeeTripsSummaryView(APIView):
@@ -298,12 +294,11 @@ class EmployeeTripsSummaryView(APIView):
         user = request.user
 
         if user.role != "EMPRESA":
-            return Response({'error': 'No autorizado'}, status=403)
+            raise UnauthorizedAccessError("Solo EMPRESA puede ver este reporte")
 
-        try:
-            empresa = EmpresaProfile.objects.get(user=user)
-        except EmpresaProfile.DoesNotExist:
-            return Response({'error': 'No tienes un perfil de empresa asociado'}, status=403)
+        empresa = get_user_empresa(user)
+        if not empresa:
+            raise EmpresaProfileNotFoundError()
 
         # Subqueries para cada empleado
         viajes_qs = Viaje.objects.filter(
@@ -349,7 +344,6 @@ class EmployeeTripsSummaryView(APIView):
             Q(days__gt=0) |
             Q(nonExemptDays__gt=0) |
             Q(exemptDays__gt=0)
-
         )
 
         data = [{
@@ -360,7 +354,7 @@ class EmployeeTripsSummaryView(APIView):
             'nonExemptDays': e.nonExemptDays,
         } for e in empleados]
 
-        return Response(data, status=200)
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class MasterCompanyEmployeesView(APIView):
@@ -372,12 +366,9 @@ class MasterCompanyEmployeesView(APIView):
         user = request.user
 
         if user.role != "MASTER":
-            return Response({'error': 'No autorizado'}, status=403)
+            raise UnauthorizedAccessError("Solo MASTER puede acceder a este reporte")
 
-        try:
-            empresa = EmpresaProfile.objects.get(pk=empresa_id)
-        except EmpresaProfile.DoesNotExist:
-            return Response({'error': 'Empresa no encontrada'}, status=404)
+        empresa = get_object_or_404(EmpresaProfile, pk=empresa_id)
 
         viajes_qs = Viaje.objects.filter(
             empleado=OuterRef('pk'),
@@ -432,4 +423,4 @@ class MasterCompanyEmployeesView(APIView):
             'nonExemptDays': e.nonExemptDays,
         } for e in empleados]
 
-        return Response(data, status=200)
+        return Response(data, status=status.HTTP_200_OK)
