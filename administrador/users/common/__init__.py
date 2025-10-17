@@ -1,4 +1,27 @@
 """
 Módulo común con utilidades reutilizables
-Contiene servicios, excepciones y helpers compartidos entre módulos
+Contiene servicios, excepciones, validators y helpers compartidos entre módulos
 """
+from .validators import (
+    validate_dni_format,
+    validate_nie_format,
+    validate_nif_format,
+    validate_dni_nie_nif,
+    validate_dni_serializer,
+    validate_nie_serializer,
+    validate_nif_serializer,
+    validate_dni_nie_nif_serializer,
+    normalize_documento
+)
+
+__all__ = [
+    'validate_dni_format',
+    'validate_nie_format',
+    'validate_nif_format',
+    'validate_dni_nie_nif',
+    'validate_dni_serializer',
+    'validate_nie_serializer',
+    'validate_nif_serializer',
+    'validate_dni_nie_nif_serializer',
+    'normalize_documento',
+]

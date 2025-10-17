@@ -11,6 +11,7 @@ from django.utils.text import slugify
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 from users.common.services import get_user_empresa
 from users.common.exceptions import EmpresaProfileNotFoundError
+from users.common.validators import validate_dni_nie_nif, normalize_documento
 
 
 # ============================================================================
@@ -40,7 +41,10 @@ def generate_unique_username(base_name: str) -> str:
 
 def generate_employee_email(nombre: str, apellido: str, nombre_empresa: str) -> str:
     """
-    Genera un email corporativo para el empleado.
+    DEPRECATED: Esta función ya no se usa.
+    Los emails ahora son obligatorios y deben ser proporcionados.
+
+    Se mantiene por compatibilidad con código legacy pero no debe usarse.
 
     Args:
         nombre: Nombre del empleado
@@ -149,7 +153,7 @@ def create_empleado(
     nombre: str,
     apellido: str,
     dni: str,
-    email: str = None,
+    email: str,  # Ahora es obligatorio
     username: str = None,
     password: str = "empleado"
 ) -> EmpleadoProfile:
@@ -160,25 +164,35 @@ def create_empleado(
         empresa: Empresa a la que pertenece
         nombre: Nombre del empleado
         apellido: Apellido del empleado
-        dni: DNI del empleado
-        email: Email (se genera automáticamente si no se proporciona)
+        dni: DNI del empleado (será normalizado automáticamente)
+        email: Email del empleado (OBLIGATORIO)
         username: Username (se genera automáticamente si no se proporciona)
         password: Contraseña (default: "empleado")
 
     Returns:
         EmpleadoProfile creado
 
+    Raises:
+        ValueError: Si el email no se proporciona o el DNI es inválido
+
     Example:
         empleado = create_empleado(
             empresa=mi_empresa,
             nombre="Juan",
             apellido="Perez",
-            dni="12345678A"
+            dni="12345678A",
+            email="juan.perez@empresa.com"
         )
     """
-    # Generar email si no se proporciona
+    # Validar que el email sea proporcionado
     if not email:
-        email = generate_employee_email(nombre, apellido, empresa.nombre_empresa)
+        raise ValueError("El email es obligatorio")
+
+    # Normalizar y validar DNI
+    dni_normalized = normalize_documento(dni)
+    is_valid, error_msg = validate_dni_nie_nif(dni_normalized)
+    if not is_valid:
+        raise ValueError(f"DNI inválido: {error_msg}")
 
     # Generar username si no se proporciona
     if not username:
@@ -200,7 +214,7 @@ def create_empleado(
         empresa=empresa,
         nombre=nombre,
         apellido=apellido,
-        dni=dni
+        dni=dni_normalized  # Guardar DNI normalizado
     )
 
     return empleado
@@ -243,7 +257,9 @@ def process_employee_csv(
     Format CSV esperado:
         nombre,apellido,dni,email
         Juan,Perez,12345678A,juan.perez@empresa.com
-        Maria,Garcia,87654321B,
+        Maria,Garcia,87654321B,maria.garcia@empresa.com
+
+    NOTA: Todos los campos son obligatorios en el CSV.
 
     Example:
         resultado = process_employee_csv(mi_empresa, archivo_csv)
@@ -264,45 +280,46 @@ def process_employee_csv(
         for row in reader:
             try:
                 # Parsear row
-                if len(row) < 3:
-                    errores.append({"row": row, "error": "Formato inválido"})
+                if len(row) < 4:
+                    errores.append({"row": row, "error": "Formato inválido. Se requiere: nombre,apellido,dni,email"})
                     continue
 
-                nombre, apellido, dni = row[0], row[1], row[2]
-                email = row[3] if len(row) > 3 else ""
+                nombre, apellido, dni, email = row[0], row[1], row[2], row[3]
 
                 # Validaciones básicas
-                if not nombre or not apellido or not dni:
-                    errores.append({"dni": dni, "error": "Nombre, Apellido y DNI son obligatorios"})
+                if not nombre or not apellido or not dni or not email:
+                    errores.append({"dni": dni, "error": "Nombre, Apellido, DNI y Email son obligatorios"})
+                    continue
+
+                # Normalizar DNI
+                dni_normalized = normalize_documento(dni)
+
+                # Validar formato DNI
+                is_valid, error_msg = validate_dni_nie_nif(dni_normalized)
+                if not is_valid:
+                    errores.append({"dni": dni, "error": error_msg})
                     continue
 
                 # Verificar si ya existe en esta empresa
-                if EmpleadoProfile.objects.filter(empresa=empresa, dni=dni).exists():
+                if EmpleadoProfile.objects.filter(empresa=empresa, dni=dni_normalized).exists():
                     empleados_omitidos.append({"dni": dni, "mensaje": "Ya registrado en la empresa"})
                     continue
 
-                # Generar username
-                username = f"{nombre}{apellido}".replace(" ", "").lower()
-
-                # Generar email si no viene
-                if not email:
-                    email = generate_employee_email(nombre, apellido, empresa.nombre_empresa)
-
-                # Validar duplicados
+                # Validar email duplicado
                 if CustomUser.objects.filter(email=email).exists():
                     errores.append({"dni": dni, "error": "El email ya está registrado"})
                     continue
 
-                if CustomUser.objects.filter(username=username).exists():
-                    errores.append({"dni": dni, "error": "El username ya está registrado"})
-                    continue
+                # Generar username único
+                base = f"{nombre}{apellido}"
+                username = generate_unique_username(base)
 
                 # Crear empleado
                 empleado = create_empleado(
                     empresa=empresa,
                     nombre=nombre,
                     apellido=apellido,
-                    dni=dni,
+                    dni=dni_normalized,
                     email=email,
                     username=username
                 )

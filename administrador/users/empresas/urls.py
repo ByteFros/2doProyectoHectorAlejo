@@ -1,30 +1,33 @@
 """
-URLs del módulo de empresas y empleados
+URLs del módulo de empresas y empleados usando DRF Routers
 """
-from django.urls import path
-from .views import (
-    RegisterEmpresaView,
-    RegisterEmployeeView,
-    BatchRegisterEmployeesView,
-    EliminarEmpleadoView,
-    EmpresaManagementView,
-    PendingCompaniesView,
-    PendingEmployeesByCompanyView
-)
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+
+from .viewsets import EmpresaViewSet, EmpleadoViewSet
+
+# Crear router y registrar ViewSets
+router = DefaultRouter()
+router.register(r'empresas', EmpresaViewSet, basename='empresa')
+router.register(r'empleados', EmpleadoViewSet, basename='empleado')
+
+# URLs generadas automáticamente por el router:
+# GET    /empresas/                       -> list (listar empresas)
+# POST   /empresas/                       -> create (crear empresa)
+# GET    /empresas/{id}/                  -> retrieve (detalle empresa)
+# PUT    /empresas/{id}/                  -> update (actualizar empresa)
+# PATCH  /empresas/{id}/                  -> partial_update (actualizar permisos)
+# DELETE /empresas/{id}/                  -> destroy (eliminar empresa)
+#
+# GET    /empleados/                      -> list (listar empleados)
+# POST   /empleados/                      -> create (crear empleado)
+# GET    /empleados/{id}/                 -> retrieve (detalle empleado)
+# PUT    /empleados/{id}/                 -> update (actualizar empleado)
+# PATCH  /empleados/{id}/                 -> partial_update (actualizar parcial)
+# DELETE /empleados/{id}/                 -> destroy (eliminar empleado)
+# POST   /empleados/batch-upload/         -> batch_upload (carga masiva CSV)
+# GET    /empleados/pending/              -> pending (empleados con viajes EN_REVISION)
 
 urlpatterns = [
-    # Gestión de empresas
-    path('empresas/new/', RegisterEmpresaView.as_view(), name='crear_empresa'),
-    path('empresas/', EmpresaManagementView.as_view(), name='listar_empresas'),
-    path('empresas/<int:empresa_id>/', EmpresaManagementView.as_view(), name='gestionar_empresa'),
-
-    # Gestión de empleados
-    path('empleados/nuevo/', RegisterEmployeeView.as_view(), name='registrar_empleado'),
-    path('empleados/batch-upload/', BatchRegisterEmployeesView.as_view(), name='batch_register_employees'),
-    path('empleados/<int:empleado_id>/', EliminarEmpleadoView.as_view(), name='eliminar_empleado'),
-
-    # Empresas y empleados con viajes pendientes
-    path('empresas/pending/', PendingCompaniesView.as_view(), name='pending_companies'),
-    path('empresas/<int:empresa_id>/empleados/pending/', PendingEmployeesByCompanyView.as_view(),
-         name='pending_employees_by_company'),
+    path('', include(router.urls)),
 ]

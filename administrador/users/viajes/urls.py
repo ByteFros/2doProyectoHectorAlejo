@@ -41,8 +41,9 @@ urlpatterns = [
          PendingTripsByEmployeeView.as_view(), name='pending-trips-by-employee'),
 
     # Verificación y estadísticas
-    path('empleados/viaje-en-curso/', VerificarViajeEnCursoView.as_view(), name='verificar_viaje_en_curso'),
-    path('empleados/ciudades/', EmployeeCityStatsView.as_view(), name='employee_city_stats'),
+    # NOTA: Prefijadas con 'viajes/' para evitar conflicto con el router de empleados del módulo empresas
+    path('viajes/empleados/viaje-en-curso/', VerificarViajeEnCursoView.as_view(), name='verificar_viaje_en_curso'),
+    path('viajes/empleados/ciudades/', EmployeeCityStatsView.as_view(), name='employee_city_stats'),
 
     # Gestión de días de viaje
     path('viajes/<int:viaje_id>/dias/', DiaViajeListView.as_view(), name='dias-list'),

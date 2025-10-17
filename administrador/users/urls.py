@@ -35,6 +35,8 @@ urlpatterns = [
 
     # Usuarios
     path('profile/', UserDetailView.as_view(), name='profile'),
-    path('empleados/', EmployeeListView.as_view(), name='empleados'),
-    path('empresas/<int:empresa_id>/empleados/', EmpleadosPorEmpresaView.as_view(), name='empleados_por_empresa'),
+    # Las siguientes rutas están comentadas porque el módulo empresas usa ViewSets con Router
+    # que ya genera estas rutas automáticamente. Descomentar solo si se necesitan las vistas legacy.
+    # path('empleados/', EmployeeListView.as_view(), name='empleados'),
+    # path('empresas/<int:empresa_id>/empleados/', EmpleadosPorEmpresaView.as_view(), name='empleados_por_empresa'),
 ]
