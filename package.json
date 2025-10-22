@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@remix-run/serve": "^2.16.8"
+  }
+}

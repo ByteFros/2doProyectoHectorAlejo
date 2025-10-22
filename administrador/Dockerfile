@@ -14,6 +14,9 @@ RUN pip install -r requirements.txt
 # Copia todo el código (incluido el script de espera)
 COPY . .
 
+# Convierte terminadores de línea de Windows a Unix
+RUN sed -i 's/\r$//' /app/wait-for-it.sh
+
 # Da permisos de ejecución al script
 RUN chmod +x /app/wait-for-it.sh
 
