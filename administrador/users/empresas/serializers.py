@@ -2,9 +2,79 @@
 Serializers para el módulo de empresas y empleados
 """
 from rest_framework import serializers
-from users.models import EmpresaProfile, EmpleadoProfile, CustomUser
+from users.models import EmpresaProfile, EmpleadoProfile, CustomUser, Viaje
 from users.common.validators import validate_dni_nie_nif_serializer, validate_nif_serializer
 
+
+# ==================== SERIALIZERS ANIDADOS PARA 'include' ====================
+
+class ViajeNestedSerializer(serializers.ModelSerializer):
+    """Serializer simplificado de viajes para anidar en empleados"""
+    class Meta:
+        model = Viaje
+        fields = [
+            'id', 'destino', 'ciudad', 'pais', 'es_internacional',
+            'fecha_inicio', 'fecha_fin', 'estado',
+            'dias_viajados', 'empresa_visitada', 'motivo', 'fecha_solicitud'
+        ]
+        read_only_fields = fields
+
+
+class EmpleadoNestedSerializer(serializers.ModelSerializer):
+    """Serializer simplificado de empleados para anidar en empresas"""
+    email = serializers.EmailField(source="user.email", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = EmpleadoProfile
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username']
+        read_only_fields = fields
+
+
+class EmpresaNestedSerializer(serializers.ModelSerializer):
+    """Serializer completo de empresa para anidar en empleados"""
+    class Meta:
+        model = EmpresaProfile
+        fields = ['id', 'nombre_empresa', 'nif', 'address', 'city', 'postal_code', 'correo_contacto', 'permisos']
+        read_only_fields = fields
+
+
+# ==================== SERIALIZERS DINÁMICOS ====================
+
+class EmpresaWithEmpleadosSerializer(serializers.ModelSerializer):
+    """Serializer de empresa con empleados anidados (include=empleados)"""
+    empleados = EmpleadoNestedSerializer(many=True, read_only=True)
+    empleados_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmpresaProfile
+        fields = ['id', 'nombre_empresa', 'nif', 'address', 'city', 'postal_code',
+                  'correo_contacto', 'permisos', 'empleados', 'empleados_count']
+        read_only_fields = fields
+
+    def get_empleados_count(self, obj):
+        return obj.empleados.count()
+
+
+class EmpleadoWithViajesSerializer(serializers.ModelSerializer):
+    """Serializer de empleado con viajes anidados (include=viajes)"""
+    empresa = EmpresaNestedSerializer(read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    viajes = ViajeNestedSerializer(many=True, read_only=True, source='viaje_set')
+    viajes_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EmpleadoProfile
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username',
+                  'empresa', 'viajes', 'viajes_count']
+        read_only_fields = fields
+
+    def get_viajes_count(self, obj):
+        return obj.viaje_set.count()
+
+
+# ==================== SERIALIZERS ORIGINALES ====================
 
 class EmpresaCreateSerializer(serializers.Serializer):
     """Serializer para crear empresa"""

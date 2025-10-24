@@ -335,12 +335,14 @@ class CompanyTripsSummarySerializer(serializers.Serializer):
     empresa = serializers.CharField()
     trips = serializers.IntegerField()
     days = serializers.IntegerField()
+    exemptDays = serializers.IntegerField()
     nonExemptDays = serializers.IntegerField()
+    empleados = serializers.ListField(required=False)  # Campo opcional para el desglose
 
 
 class TripsPerMonthSerializer(serializers.Serializer):
     month = serializers.CharField()     # ej. '2025-03'
-    totalDays = serializers.IntegerField()
+    totalTrips = serializers.IntegerField()  # Número de viajes iniciados en el mes
 
 class TripsTypeSerializer(serializers.Serializer):
     national = serializers.IntegerField()

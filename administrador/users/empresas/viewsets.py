@@ -19,7 +19,9 @@ from .serializers import (
     EmpresaCreateSerializer,
     EmpleadoCreateSerializer,
     BatchEmployeeUploadSerializer,
-    EmpresaUpdatePermissionsSerializer
+    EmpresaUpdatePermissionsSerializer,
+    EmpresaWithEmpleadosSerializer,
+    EmpleadoWithViajesSerializer
 )
 from .services import (
     create_empresa,
@@ -62,12 +64,35 @@ class EmpresaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, CanAccessEmpresa]
 
     def get_serializer_class(self):
-        """Retorna el serializer apropiado según la acción"""
+        """Retorna el serializer apropiado según la acción y query params"""
         if self.action == 'create':
             return EmpresaCreateSerializer
         elif self.action == 'partial_update' and 'permisos' in self.request.data:
             return EmpresaUpdatePermissionsSerializer
+
+        # Detectar parámetro 'include' para respuestas anidadas
+        if self.action in ['list', 'retrieve']:
+            include = self.request.query_params.get('include', '')
+            if 'empleados' in include:
+                return EmpresaWithEmpleadosSerializer
+
         return EmpresaProfileSerializer
+
+    def get_queryset(self):
+        """Optimiza queries según parámetro 'include'"""
+        queryset = super().get_queryset()
+
+        # Optimizar queries según lo que se incluya
+        include = self.request.query_params.get('include', '')
+        if 'empleados' in include:
+            # Prefetch empleados con sus usuarios
+            # Nota: el related_name es 'empleados' (ver models.py)
+            queryset = queryset.prefetch_related(
+                'empleados',
+                'empleados__user'
+            )
+
+        return queryset
 
     def get_permissions(self):
         """Define permisos específicos por acción"""
@@ -159,9 +184,16 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'apellido', 'dni', 'user__email']
 
     def get_serializer_class(self):
-        """Retorna el serializer apropiado según la acción"""
+        """Retorna el serializer apropiado según la acción y query params"""
         if self.action == 'create':
             return EmpleadoCreateSerializer
+
+        # Detectar parámetro 'include' para respuestas anidadas
+        if self.action in ['list', 'retrieve']:
+            include = self.request.query_params.get('include', '')
+            if 'viajes' in include:
+                return EmpleadoWithViajesSerializer
+
         return EmpleadoProfileSerializer
 
     def get_permissions(self):
@@ -173,10 +205,17 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filtra el queryset según el rol del usuario.
+        Filtra el queryset según el rol del usuario y optimiza según 'include'.
         Usa la lógica de common.services.filter_queryset_by_empresa
         """
         queryset = super().get_queryset()
+
+        # Optimizar queries según lo que se incluya
+        include = self.request.query_params.get('include', '')
+        if 'viajes' in include:
+            # Prefetch viajes del empleado
+            queryset = queryset.prefetch_related('viaje_set')
+
         # Reutilizar la lógica de filtrado de common
         return filter_queryset_by_empresa(self.request.user, queryset)
 

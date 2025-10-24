@@ -166,9 +166,10 @@ def crear_viaje(
     return viaje
 
 
+@transaction.atomic
 def iniciar_viaje(viaje: Viaje) -> Viaje:
     """
-    Inicia un viaje (cambia estado a EN_CURSO).
+    Inicia un viaje (cambia estado a EN_CURSO) y crea los DiaViaje.
 
     Args:
         viaje: Viaje a iniciar
@@ -184,6 +185,10 @@ def iniciar_viaje(viaje: Viaje) -> Viaje:
 
     viaje.estado = "EN_CURSO"
     viaje.save()
+
+    # Crear todos los DiaViaje al iniciar el viaje
+    crear_dias_viaje(viaje)
+
     return viaje
 
 
@@ -191,7 +196,9 @@ def iniciar_viaje(viaje: Viaje) -> Viaje:
 def finalizar_viaje(viaje: Viaje) -> Viaje:
     """
     Finaliza un viaje y lo pasa a estado EN_REVISION.
-    Crea objetos DiaViaje para cada jornada.
+
+    Nota: Los DiaViaje ya deben existir (se crean al iniciar el viaje).
+    Si por alguna razón no existen, se crean aquí como fallback.
 
     Args:
         viaje: Viaje a finalizar
@@ -209,8 +216,13 @@ def finalizar_viaje(viaje: Viaje) -> Viaje:
     viaje.estado = 'EN_REVISION'
     viaje.save()
 
-    # Crear objetos DiaViaje para cada jornada
-    crear_dias_viaje(viaje)
+    # Verificar que existen los DiaViaje (deberían existir desde iniciar_viaje)
+    dias_esperados = (viaje.fecha_fin - viaje.fecha_inicio).days + 1
+    dias_existentes = viaje.dias.count()
+
+    # Fallback: crear días si no existen (para viajes creados antes de este cambio)
+    if dias_existentes < dias_esperados:
+        crear_dias_viaje(viaje)
 
     return viaje
 
@@ -304,6 +316,42 @@ def crear_dias_viaje(viaje: Viaje) -> List[DiaViaje]:
 
 
 @transaction.atomic
+def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> List[DiaViaje]:
+    """
+    Crea e inicializa DiaViaje para viajes ya finalizados (uso en scripts).
+
+    Este método es útil para scripts que crean viajes directamente en estado
+    FINALIZADO (por ejemplo, para datos de prueba históricos).
+
+    Args:
+        viaje: Viaje en estado FINALIZADO sin DiaViaje
+        exentos: Si True, marca todos los días como exentos. Si False, como no exentos.
+
+    Returns:
+        Lista de DiaViaje creados
+
+    Raises:
+        ValueError: Si el viaje no está FINALIZADO o EN_REVISION
+    """
+    if viaje.estado not in ["FINALIZADO", "EN_REVISION"]:
+        raise ValueError(
+            f"Este método es solo para viajes FINALIZADOS o EN_REVISION. "
+            f"Estado actual: {viaje.estado}"
+        )
+
+    # Crear todos los días
+    dias = crear_dias_viaje(viaje)
+
+    # Inicializar todos como revisados y con el estado de exento especificado
+    for dia in dias:
+        dia.exento = exentos
+        dia.revisado = True
+        dia.save()
+
+    return dias
+
+
+@transaction.atomic
 def procesar_revision_viaje(
     viaje: Viaje,
     dias_data: List[Dict],
@@ -323,15 +371,26 @@ def procesar_revision_viaje(
         Diccionario con resultado de la operación
 
     Raises:
-        ValueError: Si el formato de días es inválido
+        ValueError: Si el formato de días es inválido o faltan días
     """
     # Validar formato de días
     if not isinstance(dias_data, list) or not all('id' in d and 'exento' in d for d in dias_data):
         raise ValueError("Formato de días inválido")
 
+    # Obtener días del viaje
+    dias_viaje = viaje.dias.all()
+
+    # Validar que existen todos los DiaViaje esperados
+    dias_esperados = (viaje.fecha_fin - viaje.fecha_inicio).days + 1
+    if dias_viaje.count() != dias_esperados:
+        raise ValueError(
+            f"Faltan días por crear. Esperados: {dias_esperados}, "
+            f"Encontrados: {dias_viaje.count()}. "
+            f"Ejecuta crear_dias_viaje(viaje) primero."
+        )
+
     # Mapear días enviados
     id_a_exento = {d['id']: d['exento'] for d in dias_data}
-    dias_viaje = viaje.dias.all()
     ids_validos = set(d.id for d in dias_viaje)
 
     # Validar que todos los días pertenezcan al viaje
