@@ -1,15 +1,17 @@
 """
 Comando de Django para crear gastos de prueba en viajes existentes.
-Genera gastos realistas distribuidos en los días de cada viaje.
+Genera gastos realistas distribuidos en los días de cada viaje, dejándolos pendientes de revisión.
 """
 import random
+import uuid
 from decimal import Decimal
 from datetime import date, timedelta
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.core.files.base import ContentFile
 
 from users.models import EmpleadoProfile, Viaje, DiaViaje, Gasto
-from users.viajes.services import inicializar_dias_viaje_finalizado
+from users.viajes.services import crear_dias_viaje
 
 
 class Command(BaseCommand):
@@ -83,7 +85,7 @@ class Command(BaseCommand):
             '--viajes-con-gastos',
             type=int,
             default=10,
-            help='Número de viajes FINALIZADOS a los que añadir gastos (default: 10)',
+            help='Número de viajes EN_REVISION existentes a los que añadir gastos (default: 10)',
         )
         parser.add_argument(
             '--viajes-en-revision',
@@ -124,15 +126,15 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('GENERANDO GASTOS DE PRUEBA'))
         self.stdout.write(self.style.SUCCESS('='*70 + '\n'))
 
-        # 1. Añadir gastos a viajes finalizados existentes
-        gastos_creados_finalizados = self._add_gastos_to_existing_trips(
+        # 1. Añadir gastos a viajes en revisión existentes
+        gastos_existentes = self._add_gastos_to_pending_trips(
             viajes_con_gastos,
             gastos_min,
             gastos_max
         )
 
         # 2. Crear nuevos viajes EN_REVISION con gastos
-        gastos_creados_revision = self._create_trips_en_revision(
+        gastos_nuevos = self._create_trips_en_revision(
             viajes_en_revision,
             gastos_min,
             gastos_max
@@ -140,21 +142,21 @@ class Command(BaseCommand):
 
         # Resumen final
         self._print_summary(
-            gastos_creados_finalizados,
-            gastos_creados_revision,
+            gastos_existentes,
+            gastos_nuevos,
             viajes_con_gastos,
             viajes_en_revision
         )
 
     @transaction.atomic
-    def _add_gastos_to_existing_trips(self, count, gastos_min, gastos_max):
-        """Añade gastos a viajes FINALIZADOS existentes"""
-        self.stdout.write(f'\n📋 Añadiendo gastos a {count} viajes FINALIZADOS...\n')
+    def _add_gastos_to_pending_trips(self, count, gastos_min, gastos_max):
+        """Añade gastos a viajes EN_REVISION existentes"""
+        self.stdout.write(f'\n📋 Añadiendo gastos a {count} viajes EN_REVISION existentes...\n')
 
-        # Obtener viajes finalizados sin gastos (o con pocos gastos)
+        # Obtener viajes en revisión sin gastos (o con pocos gastos)
         viajes = (
             Viaje.objects
-            .filter(estado='FINALIZADO')
+            .filter(estado='EN_REVISION')
             .prefetch_related('dias', 'dias__gastos')
             .select_related('empleado', 'empresa')
             .order_by('?')[:count]
@@ -162,20 +164,20 @@ class Command(BaseCommand):
 
         if not viajes.exists():
             self.stdout.write(
-                self.style.WARNING('⚠️  No se encontraron viajes FINALIZADOS')
+                self.style.WARNING('⚠️  No se encontraron viajes EN_REVISION')
             )
             return 0
 
         total_gastos = 0
         for idx, viaje in enumerate(viajes, 1):
-            # Asegurar que tiene DiaViaje
+            # Asegurar que tiene DiaViaje sin marcar como revisado
             if viaje.dias.count() == 0:
                 self.stdout.write(
                     self.style.WARNING(
                         f'  ⚠️  Viaje {viaje.id} sin días, creando...'
                     )
                 )
-                inicializar_dias_viaje_finalizado(viaje, exentos=True)
+                crear_dias_viaje(viaje)
 
             gastos = self._create_gastos_for_trip(viaje, gastos_min, gastos_max)
             total_gastos += gastos
@@ -183,7 +185,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f'  ✓ [{idx}/{count}] Viaje {viaje.id} '
                 f'({viaje.empleado.nombre} → {viaje.ciudad}): '
-                f'{gastos} gastos creados'
+                f'{gastos} gastos pendientes generados'
             )
 
         return total_gastos
@@ -301,11 +303,9 @@ class Command(BaseCommand):
                 monto = round(random.uniform(config['monto_min'], config['monto_max']), 2)
 
                 # Decidir estado del gasto (mayoría pendientes, algunos aprobados)
-                estado = random.choices(
-                    ['PENDIENTE', 'APROBADO', 'RECHAZADO'],
-                    weights=[70, 25, 5],
-                    k=1
-                )[0]
+                estado = 'PENDIENTE'
+
+                comprobante = self._build_dummy_receipt()
 
                 try:
                     Gasto.objects.create(
@@ -316,7 +316,8 @@ class Command(BaseCommand):
                         concepto=concepto,
                         monto=Decimal(str(monto)),
                         fecha_gasto=dia.fecha,
-                        estado=estado
+                        estado=estado,
+                        comprobante=comprobante
                     )
                     gastos_dia += 1
                     total_gastos += 1
@@ -342,17 +343,25 @@ class Command(BaseCommand):
 
         return categorias_seleccionadas
 
-    def _print_summary(self, gastos_finalizados, gastos_revision, viajes_finalizados, viajes_revision):
+    def _build_dummy_receipt(self):
+        if not hasattr(self, '_dummy_receipt_bytes'):
+            self._dummy_receipt_bytes = b"Documento de prueba para comprobantes"
+        return ContentFile(
+            self._dummy_receipt_bytes,
+            name=f"comprobante-demo-{uuid.uuid4().hex}.txt"
+        )
+
+    def _print_summary(self, gastos_existentes, gastos_nuevos, viajes_existentes, viajes_nuevos):
         """Imprime resumen de los gastos creados"""
         self.stdout.write('\n' + '='*70)
         self.stdout.write(self.style.SUCCESS('RESUMEN DE GASTOS GENERADOS'))
         self.stdout.write('='*70)
 
-        total_gastos = gastos_finalizados + gastos_revision
+        total_gastos = gastos_existentes + gastos_nuevos
 
         self.stdout.write(f'\n💰 Total de gastos creados: {total_gastos}')
-        self.stdout.write(f'   • Gastos en viajes FINALIZADOS: {gastos_finalizados}')
-        self.stdout.write(f'   • Gastos en viajes EN_REVISION: {gastos_revision}')
+        self.stdout.write(f'   • Gastos en viajes EN_REVISION existentes: {gastos_existentes}')
+        self.stdout.write(f'   • Gastos en viajes EN_REVISION nuevos: {gastos_nuevos}')
 
         # Estadísticas por categoría
         self.stdout.write('\n📊 Distribución por categoría:')
@@ -378,7 +387,7 @@ class Command(BaseCommand):
         # Viajes EN_REVISION
         viajes_en_revision_count = Viaje.objects.filter(estado='EN_REVISION').count()
         self.stdout.write(f'\n🔍 Viajes EN_REVISION: {viajes_en_revision_count}')
-        self.stdout.write(f'   ({viajes_revision} creados por este comando)')
+        self.stdout.write(f'   ({viajes_nuevos} creados por este comando)')
 
         self.stdout.write('\n' + '='*70)
         self.stdout.write(self.style.SUCCESS('✓ Gastos generados exitosamente'))

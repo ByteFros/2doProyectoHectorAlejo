@@ -2,8 +2,11 @@
 Tests actualizados para la lógica de viajes con los nuevos estados.
 """
 from datetime import date, timedelta
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+from rest_framework.authtoken.models import Token
 
 from users.models import (
     EmpresaProfile,
@@ -167,3 +170,98 @@ class ProcesarRevisionServiceTest(ViajesServicesBase):
         self.assertFalse(dia_obj.exento)
         self.assertEqual(gasto.estado, "RECHAZADO")
         self.assertEqual(resultado["dias_procesados"], 3)
+
+
+class ReabrirViajeViewTest(TestCase):
+    """Pruebas para reabrir viajes ya revisados"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.master_user = User.objects.create_user(
+            username="master",
+            email="master@test.com",
+            password="pass",
+            role="MASTER"
+        )
+        self.master_token = Token.objects.create(user=self.master_user)
+
+        self.empresa_user = User.objects.create_user(
+            username="empresa",
+            email="empresa@test.com",
+            password="pass",
+            role="EMPRESA"
+        )
+        self.empresa = EmpresaProfile.objects.create(
+            user=self.empresa_user,
+            nombre_empresa="Empresa Test",
+            nif="B98765432",
+            correo_contacto="empresa@test.com",
+            permisos=True
+        )
+
+        self.empleado_user = User.objects.create_user(
+            username="empleado",
+            email="empleado@test.com",
+            password="pass",
+            role="EMPLEADO"
+        )
+        self.empleado = EmpleadoProfile.objects.create(
+            user=self.empleado_user,
+            empresa=self.empresa,
+            nombre="Laura",
+            apellido="Revisada",
+            dni="22334455L"
+        )
+
+        self.viaje = Viaje.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa,
+            destino="Bilbao, España",
+            fecha_inicio=date(2024, 5, 1),
+            fecha_fin=date(2024, 5, 3),
+            dias_viajados=3,
+            estado="REVISADO"
+        )
+
+        dias = crear_dias_viaje(self.viaje)
+        for dia in dias:
+            dia.revisado = True
+            dia.save(update_fields=["revisado"])
+
+        self.dia = dias[0]
+
+        self.gasto = Gasto.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa,
+            viaje=self.viaje,
+            dia=self.dia,
+            concepto="Hotel",
+            monto=Decimal("120.00"),
+            fecha_gasto=self.dia.fecha,
+            estado="APROBADO"
+        )
+
+        self.reabrir_url = f"/api/users/viajes/{self.viaje.id}/reabrir/"
+
+    def test_master_puede_reabrir_viaje(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+
+        response = self.client.patch(self.reabrir_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.viaje.refresh_from_db()
+        self.dia.refresh_from_db()
+        self.gasto.refresh_from_db()
+
+        self.assertEqual(self.viaje.estado, "EN_REVISION")
+        self.assertFalse(self.viaje.dias.filter(revisado=True).exists())
+        self.assertEqual(self.gasto.estado, "PENDIENTE")
+
+    def test_no_reabre_si_no_esta_revisado(self):
+        self.viaje.estado = "EN_REVISION"
+        self.viaje.save(update_fields=['estado'])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        response = self.client.patch(self.reabrir_url)
+        self.assertEqual(response.status_code, 400)

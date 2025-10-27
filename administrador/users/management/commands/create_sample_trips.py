@@ -1,14 +1,13 @@
 """
 Comando de Django para crear viajes de prueba para empleados existentes.
-Genera viajes revisados o en revisión con destinos reales (sin gastos).
+Genera viajes en estado EN_REVISION con destinos reales (sin gastos).
 """
 import random
 from datetime import date, timedelta
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from users.models import EmpleadoProfile, Viaje
-from users.viajes.services import inicializar_dias_viaje_finalizado
+from users.viajes.services import crear_dias_viaje
 
 
 class Command(BaseCommand):
@@ -231,8 +230,8 @@ class Command(BaseCommand):
             empresa_visitada = random.choice(destino_info['empresas'])
             motivo = random.choice(self.MOTIVOS)
 
-            # Estado del viaje (mayoría finalizados)
-            estado = self._get_random_estado()
+            # Estado del viaje
+            estado = 'EN_REVISION'
 
             # Construir destino
             destino = f"{destino_info['ciudad']}, {destino_info['pais']}"
@@ -254,10 +253,12 @@ class Command(BaseCommand):
                 )
 
                 # Crear DiaViaje para viajes revisados o en revisión
-                if estado in ["REVISADO", "EN_REVISION"]:
-                    # 70% de viajes con días exentos, 30% con días no exentos (mezcla)
-                    exentos = random.random() > 0.3
-                    inicializar_dias_viaje_finalizado(viaje, exentos=exentos)
+                dias_creados = crear_dias_viaje(viaje)
+                # Algunos días se marcarán como no exentos para generar variedad
+                for dia in dias_creados:
+                    if random.random() < 0.3:
+                        dia.exento = False
+                        dia.save(update_fields=["exento"])
 
                 viajes_creados += 1
 
@@ -296,8 +297,7 @@ class Command(BaseCommand):
     def _get_random_estado(self):
         """Retorna un estado aleatorio con pesos"""
         # 80% revisados, 20% en revisión
-        estados = ['REVISADO'] * 80 + ['EN_REVISION'] * 20
-        return random.choice(estados)
+        return 'EN_REVISION'
 
     def _print_summary(self, total_empleados, viajes_creados, trips_per_employee):
         """Imprime resumen de los viajes creados"""
@@ -326,8 +326,11 @@ class Command(BaseCommand):
         internacionales = Viaje.objects.filter(es_internacional=True).count()
 
         self.stdout.write('\n🌍 Distribución geográfica:')
-        self.stdout.write(f'   • Viajes nacionales: {nacionales} ({nacionales/viajes_creados*100:.1f}%)')
-        self.stdout.write(f'   • Viajes internacionales: {internacionales} ({internacionales/viajes_creados*100:.1f}%)')
+        if viajes_creados > 0:
+            self.stdout.write(f'   • Viajes nacionales: {nacionales} ({nacionales/viajes_creados*100:.1f}%)')
+            self.stdout.write(f'   • Viajes internacionales: {internacionales} ({internacionales/viajes_creados*100:.1f}%)')
+        else:
+            self.stdout.write('   • Sin viajes generados')
 
         # Top 5 destinos más visitados
         from django.db.models import Count
@@ -352,8 +355,11 @@ class Command(BaseCommand):
 
         self.stdout.write('\n📅 Estadísticas de días de viaje:')
         self.stdout.write(f'   • Total de días creados: {total_dias}')
-        self.stdout.write(f'   • Días exentos: {dias_exentos} ({dias_exentos/total_dias*100:.1f}%)')
-        self.stdout.write(f'   • Días no exentos: {dias_no_exentos} ({dias_no_exentos/total_dias*100:.1f}%)')
+        if total_dias > 0:
+            self.stdout.write(f'   • Días exentos: {dias_exentos} ({dias_exentos/total_dias*100:.1f}%)')
+            self.stdout.write(f'   • Días no exentos: {dias_no_exentos} ({dias_no_exentos/total_dias*100:.1f}%)')
+        else:
+            self.stdout.write('   • No se han generado días de viaje')
 
         self.stdout.write('\n' + '='*70)
         self.stdout.write(self.style.SUCCESS('✓ Viajes generados exitosamente'))

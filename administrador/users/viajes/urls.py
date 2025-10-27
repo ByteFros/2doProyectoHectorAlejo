@@ -9,9 +9,10 @@ from .views import (
     ListarTodosLosViajesView,
     PendingTripsDetailView,
     FinalizarRevisionViajeView,
+    ReabrirViajeView,
     EmployeeCityStatsView,
     DiaViajeListView,
-    DiaViajeUpdateView
+    DiaViajeReviewView
 )
 
 urlpatterns = [
@@ -19,6 +20,7 @@ urlpatterns = [
     path('viajes/new/', CrearViajeView.as_view(), name='nuevo_viaje'),
     path('viajes/<int:viaje_id>/finalizar_revision/', FinalizarRevisionViajeView.as_view(),
          name='finalizar_revision_viaje'),
+    path('viajes/<int:viaje_id>/reabrir/', ReabrirViajeView.as_view(), name='reabrir_viaje'),
 
     # Listado de viajes
     path('viajes/revisados/', ListarViajesRevisadosView.as_view(), name='viajes-revisados'),
@@ -34,5 +36,5 @@ urlpatterns = [
 
     # Gestión de días de viaje
     path('viajes/<int:viaje_id>/dias/', DiaViajeListView.as_view(), name='dias-list'),
-    path('viajes/<int:viaje_id>/dias/<int:dia_id>/', DiaViajeUpdateView.as_view(), name='dias-update'),
+    path('dias/<int:dia_id>/review/', DiaViajeReviewView.as_view(), name='dias-review'),
 ]

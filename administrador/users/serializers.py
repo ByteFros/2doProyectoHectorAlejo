@@ -90,20 +90,38 @@ class GastoSerializer(serializers.ModelSerializer):
         return gasto
 
 
+class DiaViajeGastoSerializer(serializers.ModelSerializer):
+    """Gasto simplificado para uso dentro de DiaViajeSerializer"""
+
+    class Meta:
+        model = Gasto
+        fields = [
+            "id",
+            "concepto",
+            "monto",
+            "fecha_gasto",
+            "estado",
+            "fecha_solicitud",
+            "comprobante",
+        ]
+        read_only_fields = fields
+
+
 class DiaViajeSerializer(serializers.ModelSerializer):
     """Serializador para representar cada día de viaje junto con sus gastos"""
-    gastos = GastoSerializer(many=True, read_only=True)
+    dia_id = serializers.IntegerField(source='id', read_only=True)
+    gastos = DiaViajeGastoSerializer(many=True, read_only=True)
 
     class Meta:
         model = DiaViaje
         fields = [
-            'id',
+            'dia_id',
             'fecha',
             'exento',
             'revisado',
             'gastos',
         ]
-        read_only_fields = ['id', 'fecha', 'gastos']
+        read_only_fields = ['dia_id', 'fecha', 'gastos']
 
     def update(self, instance, validated_data):
         # Solo actualizar los flags exento y revisado

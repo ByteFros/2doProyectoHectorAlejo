@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje
+from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje, Gasto
 from users.serializers import ViajeSerializer, PendingTripSerializer, DiaViajeSerializer
 from users.common.services import get_user_empleado, get_user_empresa
 from users.common.exceptions import (
@@ -258,6 +258,40 @@ class FinalizarRevisionViajeView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class ReabrirViajeView(APIView):
+    """Permite reabrir un viaje revisado para recabar más información"""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, viaje_id):
+        viaje = get_object_or_404(Viaje, id=viaje_id)
+
+        if viaje.estado != 'REVISADO':
+            return Response(
+                {"error": "Solo se pueden reabrir viajes en estado REVISADO"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = request.user
+        if user.role == 'EMPRESA':
+            empresa = get_object_or_404(EmpresaProfile, user=user)
+            if viaje.empresa != empresa:
+                raise UnauthorizedAccessError("No autorizado para reabrir este viaje")
+        elif user.role != 'MASTER':
+            raise UnauthorizedAccessError("Solo MASTER o EMPRESA pueden reabrir viajes")
+
+        viaje.estado = 'EN_REVISION'
+        viaje.save(update_fields=['estado'])
+
+        viaje.dias.update(revisado=False)
+        Gasto.objects.filter(viaje=viaje).exclude(estado='PENDIENTE').update(estado='PENDIENTE')
+
+        return Response(
+            {"message": "Viaje reabierto. Los días y gastos deberán revisarse nuevamente."},
+            status=status.HTTP_200_OK
+        )
+
+
 class EmployeeCityStatsView(APIView):
     """Devuelve estadísticas de ciudades visitadas por un empleado (viajes revisados)"""
     authentication_classes = [TokenAuthentication]
@@ -300,14 +334,21 @@ class DiaViajeListView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class DiaViajeUpdateView(APIView):
-    """Permite aprobar o exentar un día de viaje"""
+class DiaViajeReviewView(APIView):
+    """Permite aprobar o marcar gasto no exento para un día de viaje"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def put(self, request, viaje_id, dia_id):
+    def put(self, request, dia_id):
         user = request.user
-        viaje = get_object_or_404(Viaje, id=viaje_id, estado='EN_REVISION')
+        dia = get_object_or_404(DiaViaje, id=dia_id)
+        viaje = dia.viaje
+
+        if viaje.estado != 'EN_REVISION':
+            return Response(
+                {'error': 'El viaje ya no se encuentra en revisión'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Permisos según rol
         if user.role == 'EMPRESA':
@@ -319,7 +360,6 @@ class DiaViajeUpdateView(APIView):
         elif user.role != 'MASTER':
             return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
 
-        dia = get_object_or_404(DiaViaje, id=dia_id, viaje=viaje)
         exento = request.data.get('exento')
         if not isinstance(exento, bool):
             return Response({'error': 'Campo "exento" inválido. Debe ser true o false.'}, status=status.HTTP_400_BAD_REQUEST)

@@ -333,9 +333,9 @@ def process_employee_csv(
                     errores.append({"dni": dni, "error": "El email ya está registrado"})
                     continue
 
-                # Generar username único
-                base = f"{nombre}{apellido}"
-                username = generate_unique_username(base)
+                # Generar username basado en email (sin dominio) para mantener formato conocido
+                username_base = email.split('@')[0]
+                username = generate_unique_username(username_base)
 
                 salario = None
                 if salario_header:

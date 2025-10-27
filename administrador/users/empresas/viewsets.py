@@ -392,7 +392,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-        viajes_queryset = Viaje.objects.filter(estado='EN_REVISION')
+        viajes_queryset = Viaje.objects.filter(estado__in=['EN_REVISION', 'REVISADO'])
         if empresa_filter:
             viajes_queryset = viajes_queryset.filter(empresa=empresa_filter)
 
@@ -400,11 +400,11 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             EmpleadoProfile.objects.filter(viaje__estado='EN_REVISION')
             .select_related('user', 'empresa')
             .prefetch_related(
-                Prefetch(
-                    'viaje_set',
-                    queryset=viajes_queryset.order_by('fecha_inicio'),
-                    to_attr='viajes_pendientes'
-                )
+            Prefetch(
+                'viaje_set',
+                queryset=viajes_queryset.order_by('fecha_inicio'),
+                to_attr='viajes_pendientes'
+            )
             )
             .distinct()
         )
@@ -418,6 +418,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             empleado_data = EmpleadoProfileSerializer(empleado).data
 
             # Agregar viajes pendientes
+
             viajes_data = []
             for viaje in empleado.viajes_pendientes:
                 viajes_data.append({

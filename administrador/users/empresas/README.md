@@ -492,11 +492,11 @@ María,García,87654321A,maria@empresa.com,29500.75
 ---
 
 #### `GET /empleados/pending/`
-Lista empleados que tienen viajes en estado `EN_REVISION`.
+Lista empleados que tienen viajes en estado `EN_REVISION` o `REVISADO`.
 
 **Permisos:**
-- ✅ MASTER: Ve todos los empleados con viajes pendientes
-- ✅ EMPRESA (con permisos=true): Ve solo sus empleados con viajes pendientes
+- ✅ MASTER: Ve todos los empleados con viajes pendientes o revisados
+- ✅ EMPRESA (con permisos=true): Ve solo sus empleados con viajes pendientes o revisados
 - ❌ EMPRESA (con permisos=false): No autorizado
 - ❌ EMPLEADO: No autorizado
 
@@ -535,7 +535,7 @@ Lista empleados que tienen viajes en estado `EN_REVISION`.
 ]
 ```
 
-**Uso típico:** Este endpoint es útil para que las empresas vean qué empleados tienen viajes esperando aprobación/revisión.
+**Uso típico:** Este endpoint es útil para que las empresas vean qué empleados tienen viajes esperando aprobación/revisión y los que ya han sido revisados.
 
 ---
 

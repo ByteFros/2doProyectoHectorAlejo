@@ -476,25 +476,48 @@ Lista todos los días de un viaje con sus gastos.
 
 ---
 
-#### `PATCH /viajes/{viaje_id}/dias/{dia_id}/`
-Actualiza un día específico (marcar como exento/revisado).
+#### `PATCH /viajes/{id}/reabrir/`
+Reabre un viaje previamente revisado para solicitar información adicional.
 
 **Permisos:**
-- ✅ EMPRESA (con permisos=true): Días de viajes de sus empleados
-- ✅ MASTER: Cualquier día
+- ✅ MASTER: Puede reabrir cualquier viaje
+- ✅ EMPRESA (con permisos=true): Puede reabrir viajes de su empresa
+- ❌ EMPLEADO: No autorizado
+
+**Respuesta:**
+```json
+{
+  "message": "Viaje reabierto. Los días y gastos deberán revisarse nuevamente."
+}
+```
+
+**Efectos secundarios:**
+- El viaje vuelve a estado `EN_REVISION`
+- Todos los días se marcan con `revisado=false`
+- Los gastos asociados se restablecen a estado `PENDIENTE`
+
+
+---
+
+#### `PUT /dias/{dia_id}/review/`
+Revisa un día de viaje (marca como exento o no exento) usando únicamente el identificador del día.
+
+**Permisos:**
+- ✅ EMPRESA (con permisos=true): Puede revisar días de sus viajes en revisión
+- ✅ MASTER: Puede revisar cualquier día
 - ❌ EMPLEADO: No autorizado
 
 **Body:**
 ```json
 {
-  "exento": false,
-  "revisado": true
+  "exento": false
 }
 ```
 
 **Efecto:**
-- Actualiza el día
-- Actualiza estado de gastos del día automáticamente
+- Actualiza el estado del día (`revisado=true` automáticamente)
+- Cambia el estado de los gastos asociados (`APROBADO` si `exento=true`, `RECHAZADO` en caso contrario)
+- Si todos los días del viaje quedan revisados, el viaje pasa a `REVISADO`
 
 ---
 
