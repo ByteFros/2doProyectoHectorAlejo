@@ -58,7 +58,8 @@ class IncludeParameterTestCase(TestCase):
             empresa=self.empresa,
             nombre="Juan",
             apellido="Pérez",
-            dni="12345678A"
+            dni="12345678A",
+            salario=30000
         )
 
         self.empleado2_user = CustomUser.objects.create_user(
@@ -72,7 +73,8 @@ class IncludeParameterTestCase(TestCase):
             empresa=self.empresa,
             nombre="María",
             apellido="García",
-            dni="87654321B"
+            dni="87654321B",
+            salario=28000
         )
 
         # Crear viajes para empleado1
@@ -84,9 +86,9 @@ class IncludeParameterTestCase(TestCase):
             pais="España",
             es_internacional=False,
             fecha_inicio=date.today(),
-            fecha_fin=date.today() + timedelta(days=2),
-            dias_viajados=3,
-            estado="PENDIENTE",
+            fecha_fin=date.today(),
+            dias_viajados=1,
+            estado="EN_REVISION",
             motivo="Reunión con cliente"
         )
 
@@ -115,7 +117,7 @@ class IncludeParameterTestCase(TestCase):
             fecha_inicio=date.today() + timedelta(days=14),
             fecha_fin=date.today() + timedelta(days=16),
             dias_viajados=3,
-            estado="APROBADO",
+            estado="REVISADO",
             motivo="Conferencia internacional"
         )
 
@@ -164,6 +166,7 @@ class EmpresaIncludeEmpleadosTest(IncludeParameterTestCase):
             self.assertIn('dni', empleado)
             self.assertIn('email', empleado)
             self.assertIn('username', empleado)
+            self.assertIn('salario', empleado)
             # NO debe tener viajes (no se pidió include=empleados.viajes)
             self.assertNotIn('viajes', empleado)
 
@@ -211,6 +214,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
 
         # Verificar que NO tiene viajes anidados
         empleado_data = response.data[0]
+        self.assertIn('salario', empleado_data)
         self.assertNotIn('viajes', empleado_data)
         self.assertNotIn('viajes_count', empleado_data)
 
@@ -232,6 +236,8 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
         self.assertIsNotNone(empleado1_data)
 
         # Verificar que SÍ tiene viajes anidados
+        self.assertIn('salario', empleado1_data)
+        self.assertEqual(empleado1_data['salario'], '30000.00')
         self.assertIn('viajes', empleado1_data)
         self.assertIn('viajes_count', empleado1_data)
         self.assertIsInstance(empleado1_data['viajes'], list)

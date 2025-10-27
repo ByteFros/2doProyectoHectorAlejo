@@ -150,7 +150,8 @@ class Command(BaseCommand):
                 'dni': dni,
                 'email': email,
                 'username': f'{nombre.lower()}.{apellido1.lower()}{i}',
-                'password': 'empleado123'
+                'password': 'empleado123',
+                'salario': random.randint(18000, 48000)
             }
 
             try:

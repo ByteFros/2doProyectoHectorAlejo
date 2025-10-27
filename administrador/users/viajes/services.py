@@ -2,9 +2,9 @@
 Servicios de lógica de negocio para viajes
 """
 from datetime import datetime, date, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 from django.db import transaction
-from users.models import Viaje, EmpleadoProfile, EmpresaProfile, Notificacion, DiaViaje, Conversacion, Mensaje
+from users.models import Viaje, EmpleadoProfile, Notificacion, DiaViaje, Conversacion, Mensaje
 
 
 # ============================================================================
@@ -35,61 +35,6 @@ def validar_fechas(fecha_inicio_str: str, fecha_fin_str: str) -> tuple:
         raise ValueError("La fecha de fin no puede ser anterior a la fecha de inicio.")
 
     return fecha_inicio, fecha_fin
-
-
-def determinar_estado_inicial(fecha_inicio: date, fecha_fin: date) -> str:
-    """
-    Determina el estado inicial de un viaje según las fechas.
-
-    Args:
-        fecha_inicio: Fecha de inicio del viaje
-        fecha_fin: Fecha de fin del viaje
-
-    Returns:
-        Estado del viaje: FINALIZADO, EN_CURSO o PENDIENTE
-    """
-    hoy = date.today()
-
-    if fecha_fin < hoy:
-        return "FINALIZADO"
-    elif fecha_inicio == hoy:
-        return "EN_CURSO"
-    elif fecha_inicio > hoy:
-        return "PENDIENTE"
-    else:
-        # Viaje comenzó en el pasado pero no ha terminado
-        return "EN_CURSO"
-
-
-def validar_conflicto_viajes(
-    empleado: EmpleadoProfile,
-    fecha_inicio: date,
-    fecha_fin: date,
-    viaje_id: Optional[int] = None
-) -> bool:
-    """
-    Verifica si hay conflicto con otros viajes del empleado.
-
-    Args:
-        empleado: Empleado a verificar
-        fecha_inicio: Fecha de inicio del nuevo viaje
-        fecha_fin: Fecha de fin del nuevo viaje
-        viaje_id: ID del viaje a excluir de la búsqueda (para updates)
-
-    Returns:
-        True si hay conflicto, False si no
-    """
-    query = Viaje.objects.filter(
-        empleado=empleado,
-        fecha_inicio__lte=fecha_fin,
-        fecha_fin__gte=fecha_inicio,
-        estado__in=["PENDIENTE", "EN_CURSO"]
-    )
-
-    if viaje_id:
-        query = query.exclude(id=viaje_id)
-
-    return query.exists()
 
 
 # ============================================================================
@@ -128,13 +73,6 @@ def crear_viaje(
     Raises:
         ValueError: Si hay conflicto con otros viajes o fechas inválidas
     """
-    # Validar conflictos
-    if validar_conflicto_viajes(empleado, fecha_inicio, fecha_fin):
-        raise ValueError("Ya tienes un viaje programado en esas fechas.")
-
-    # Determinar estado inicial
-    estado = determinar_estado_inicial(fecha_inicio, fecha_fin)
-
     # Calcular días viajados
     dias_viajados = (fecha_fin - fecha_inicio).days + 1
 
@@ -145,7 +83,7 @@ def crear_viaje(
         destino=destino,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        estado=estado,
+        estado="EN_REVISION",
         motivo=motivo or "",
         empresa_visitada=empresa_visitada or "",
         ciudad=ciudad or "",
@@ -162,128 +100,6 @@ def crear_viaje(
             mensaje=f"{nombre_empleado} ha solicitado un viaje a {viaje.destino}.",
             usuario_destino=empleado.empresa.user
         )
-
-    return viaje
-
-
-@transaction.atomic
-def iniciar_viaje(viaje: Viaje) -> Viaje:
-    """
-    Inicia un viaje (cambia estado a EN_CURSO) y crea los DiaViaje.
-
-    Args:
-        viaje: Viaje a iniciar
-
-    Returns:
-        Viaje actualizado
-
-    Raises:
-        ValueError: Si no se puede iniciar el viaje
-    """
-    if date.today() < viaje.fecha_inicio:
-        raise ValueError("Aún no puedes iniciar este viaje, la fecha de inicio no ha llegado")
-
-    viaje.estado = "EN_CURSO"
-    viaje.save()
-
-    # Crear todos los DiaViaje al iniciar el viaje
-    crear_dias_viaje(viaje)
-
-    return viaje
-
-
-@transaction.atomic
-def finalizar_viaje(viaje: Viaje) -> Viaje:
-    """
-    Finaliza un viaje y lo pasa a estado EN_REVISION.
-
-    Nota: Los DiaViaje ya deben existir (se crean al iniciar el viaje).
-    Si por alguna razón no existen, se crean aquí como fallback.
-
-    Args:
-        viaje: Viaje a finalizar
-
-    Returns:
-        Viaje actualizado
-
-    Raises:
-        ValueError: Si el viaje no está EN_CURSO
-    """
-    if viaje.estado != 'EN_CURSO':
-        raise ValueError('Solo puedes finalizar un viaje en curso.')
-
-    # Cambiar a revisión
-    viaje.estado = 'EN_REVISION'
-    viaje.save()
-
-    # Verificar que existen los DiaViaje (deberían existir desde iniciar_viaje)
-    dias_esperados = (viaje.fecha_fin - viaje.fecha_inicio).days + 1
-    dias_existentes = viaje.dias.count()
-
-    # Fallback: crear días si no existen (para viajes creados antes de este cambio)
-    if dias_existentes < dias_esperados:
-        crear_dias_viaje(viaje)
-
-    return viaje
-
-
-def cancelar_viaje(viaje: Viaje) -> Viaje:
-    """
-    Cancela un viaje pendiente.
-
-    Args:
-        viaje: Viaje a cancelar
-
-    Returns:
-        Viaje actualizado
-
-    Raises:
-        ValueError: Si el viaje no está PENDIENTE
-    """
-    if viaje.estado != "PENDIENTE":
-        raise ValueError("Solo puedes cancelar un viaje que aún está pendiente")
-
-    viaje.estado = "CANCELADO"
-    viaje.save()
-    return viaje
-
-
-@transaction.atomic
-def aprobar_rechazar_viaje(
-    viaje: Viaje,
-    nuevo_estado: str,
-    motivo: str = ""
-) -> Viaje:
-    """
-    Aprueba o rechaza un viaje.
-
-    Args:
-        viaje: Viaje a aprobar/rechazar
-        nuevo_estado: "APROBADO" o "RECHAZADO"
-        motivo: Motivo del rechazo (opcional)
-
-    Returns:
-        Viaje actualizado
-
-    Raises:
-        ValueError: Si el estado es inválido
-    """
-    if nuevo_estado not in ["APROBADO", "RECHAZADO"]:
-        raise ValueError("Estado inválido")
-
-    viaje.estado = nuevo_estado
-    viaje.save()
-
-    # Crear notificación para el empleado
-    mensaje = f"Tu viaje a {viaje.destino} ha sido {nuevo_estado.lower()}."
-    if nuevo_estado == "RECHAZADO" and motivo:
-        mensaje += f" Motivo: {motivo}"
-
-    Notificacion.objects.create(
-        tipo=f"VIAJE_{nuevo_estado}",
-        mensaje=mensaje,
-        usuario_destino=viaje.empleado.user
-    )
 
     return viaje
 
@@ -318,24 +134,24 @@ def crear_dias_viaje(viaje: Viaje) -> List[DiaViaje]:
 @transaction.atomic
 def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> List[DiaViaje]:
     """
-    Crea e inicializa DiaViaje para viajes ya finalizados (uso en scripts).
+    Crea e inicializa DiaViaje para viajes ya revisados (uso en scripts).
 
     Este método es útil para scripts que crean viajes directamente en estado
-    FINALIZADO (por ejemplo, para datos de prueba históricos).
+    REVISADO (por ejemplo, para datos de prueba históricos).
 
     Args:
-        viaje: Viaje en estado FINALIZADO sin DiaViaje
+        viaje: Viaje en estado REVISADO sin DiaViaje
         exentos: Si True, marca todos los días como exentos. Si False, como no exentos.
 
     Returns:
         Lista de DiaViaje creados
 
     Raises:
-        ValueError: Si el viaje no está FINALIZADO o EN_REVISION
+        ValueError: Si el viaje no está REVISADO o EN_REVISION
     """
-    if viaje.estado not in ["FINALIZADO", "EN_REVISION"]:
+    if viaje.estado not in ["REVISADO", "EN_REVISION"]:
         raise ValueError(
-            f"Este método es solo para viajes FINALIZADOS o EN_REVISION. "
+            f"Este método es solo para viajes REVISADOS o EN_REVISION. "
             f"Estado actual: {viaje.estado}"
         )
 
@@ -425,8 +241,8 @@ def procesar_revision_viaje(
         )
         conversacion_creada = True
 
-    # Marcar viaje como finalizado
-    viaje.estado = "FINALIZADO"
+    # Marcar viaje como revisado
+    viaje.estado = "REVISADO"
     viaje.save()
 
     return {
@@ -441,22 +257,6 @@ def procesar_revision_viaje(
 # QUERIES Y ESTADÍSTICAS
 # ============================================================================
 
-def obtener_viaje_en_curso(empleado: EmpleadoProfile) -> Optional[Viaje]:
-    """
-    Obtiene el viaje en curso de un empleado.
-
-    Args:
-        empleado: Empleado a buscar
-
-    Returns:
-        Viaje en curso o None
-    """
-    return Viaje.objects.filter(
-        empleado=empleado,
-        estado="EN_CURSO"
-    ).order_by("-fecha_inicio").first()
-
-
 def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> List[Dict]:
     """
     Obtiene estadísticas de ciudades visitadas por un empleado.
@@ -469,8 +269,8 @@ def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> List[Dict]:
     """
     viajes = Viaje.objects.filter(
         empleado=empleado,
-        estado='FINALIZADO'
-    ).exclude(estado='CANCELADO')
+        estado='REVISADO'
+    )
 
     city_stats = {}
 
@@ -500,14 +300,3 @@ def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> List[Dict]:
     return list(city_stats.values())
 
 
-def tiene_viaje_en_curso(empleado: EmpleadoProfile) -> bool:
-    """
-    Verifica si un empleado tiene un viaje en curso.
-
-    Args:
-        empleado: Empleado a verificar
-
-    Returns:
-        True si tiene viaje en curso, False si no
-    """
-    return Viaje.objects.filter(empleado=empleado, estado="EN_CURSO").exists()

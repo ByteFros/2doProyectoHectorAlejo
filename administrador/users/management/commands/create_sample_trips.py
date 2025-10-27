@@ -1,6 +1,6 @@
 """
 Comando de Django para crear viajes de prueba para empleados existentes.
-Genera viajes finalizados con destinos reales (sin gastos).
+Genera viajes revisados o en revisión con destinos reales (sin gastos).
 """
 import random
 from datetime import date, timedelta
@@ -253,8 +253,8 @@ class Command(BaseCommand):
                     motivo=motivo
                 )
 
-                # Crear DiaViaje para viajes finalizados o en revisión
-                if estado in ["FINALIZADO", "EN_REVISION"]:
+                # Crear DiaViaje para viajes revisados o en revisión
+                if estado in ["REVISADO", "EN_REVISION"]:
                     # 70% de viajes con días exentos, 30% con días no exentos (mezcla)
                     exentos = random.random() > 0.3
                     inicializar_dias_viaje_finalizado(viaje, exentos=exentos)
@@ -295,8 +295,8 @@ class Command(BaseCommand):
 
     def _get_random_estado(self):
         """Retorna un estado aleatorio con pesos"""
-        # 80% finalizados, 15% en revisión, 5% cancelados
-        estados = ['FINALIZADO'] * 80 + ['EN_REVISION'] * 15 + ['CANCELADO'] * 5
+        # 80% revisados, 20% en revisión
+        estados = ['REVISADO'] * 80 + ['EN_REVISION'] * 20
         return random.choice(estados)
 
     def _print_summary(self, total_empleados, viajes_creados, trips_per_employee):
@@ -363,6 +363,6 @@ class Command(BaseCommand):
         self.stdout.write('   • Los DiaViaje han sido creados e inicializados')
         self.stdout.write('   • Los viajes NO tienen gastos asociados todavía')
         self.stdout.write('   • Para agregar gastos, ejecuta: python manage.py create_sample_expenses')
-        self.stdout.write('   • La mayoría de viajes están en estado FINALIZADO')
+        self.stdout.write('   • La mayoría de viajes están en estado REVISADO')
         self.stdout.write('   • 70% de viajes con días exentos, 30% con días no exentos')
         self.stdout.write('   • Fechas generadas en los últimos 12 meses por defecto\n')

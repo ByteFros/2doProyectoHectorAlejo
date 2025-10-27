@@ -298,24 +298,39 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             }
         """
         # Obtener empresa
+        target_empresa = None
+        require_empresa_id = False
+
         if request.user.role == "EMPRESA":
-            empresa = get_user_empresa(request.user)
-            if not empresa:
+            target_empresa = get_user_empresa(request.user)
+            if not target_empresa:
                 raise EmpresaProfileNotFoundError()
+        elif request.user.role == "MASTER":
+            require_empresa_id = True
         else:
             return Response(
-                {"error": "Solo usuarios EMPRESA pueden usar carga masiva"},
+                {"error": "Solo usuarios MASTER o EMPRESA pueden usar carga masiva"},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Validar archivo
-        serializer = BatchEmployeeUploadSerializer(data=request.FILES)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer = BatchEmployeeUploadSerializer(
+            data=request.data,
+            require_empresa_id=require_empresa_id
+        )
+        serializer.is_valid(raise_exception=True)
 
-        # Procesar CSV
+        if request.user.role == "MASTER":
+            empresa_id = serializer.validated_data.get('empresa_id')
+            try:
+                target_empresa = EmpresaProfile.objects.get(id=empresa_id)
+            except EmpresaProfile.DoesNotExist:
+                return Response(
+                    {"empresa_id": "La empresa especificada no existe"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         csv_file = serializer.validated_data['file']
-        resultado = process_employee_csv(empresa, csv_file)
+        resultado = process_employee_csv(target_empresa, csv_file)
 
         # Serializar empleados registrados
         empleados_data = [
@@ -360,24 +375,42 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                 }
             ]
         """
-        # Base queryset: empleados con viajes EN_REVISION
-        queryset = EmpleadoProfile.objects.filter(
-            viaje__estado='EN_REVISION'
-        ).select_related('user', 'empresa').prefetch_related(
-            Prefetch(
-                'viaje_set',
-                queryset=Viaje.objects.filter(estado='EN_REVISION'),
-                to_attr='viajes_pendientes'
-            )
-        ).distinct()
+        empresa_filter = None
+        empresa_param = request.query_params.get('empresa')
 
-        # Filtrar por rol
         if request.user.role == "EMPRESA":
             empresa = get_user_empresa(request.user)
             if not empresa:
                 raise EmpresaProfileNotFoundError()
-            queryset = queryset.filter(empresa=empresa)
-        # MASTER ve todos (sin filtro adicional)
+            empresa_filter = empresa
+        elif request.user.role == "MASTER" and empresa_param:
+            try:
+                empresa_filter = EmpresaProfile.objects.get(id=empresa_param)
+            except EmpresaProfile.DoesNotExist:
+                return Response(
+                    {"error": f"La empresa con id {empresa_param} no existe"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        viajes_queryset = Viaje.objects.filter(estado='EN_REVISION')
+        if empresa_filter:
+            viajes_queryset = viajes_queryset.filter(empresa=empresa_filter)
+
+        queryset = (
+            EmpleadoProfile.objects.filter(viaje__estado='EN_REVISION')
+            .select_related('user', 'empresa')
+            .prefetch_related(
+                Prefetch(
+                    'viaje_set',
+                    queryset=viajes_queryset.order_by('fecha_inicio'),
+                    to_attr='viajes_pendientes'
+                )
+            )
+            .distinct()
+        )
+
+        if empresa_filter:
+            queryset = queryset.filter(empresa=empresa_filter)
 
         # Serializar con viajes anidados
         data = []

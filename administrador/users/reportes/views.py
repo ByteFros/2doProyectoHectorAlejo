@@ -30,7 +30,7 @@ from users.common.exceptions import (
 
 class CompanyTripsSummaryView(APIView):
     """
-    Devuelve resumen de viajes por empresa: viajes, días y días no exentos (todos los estados excepto CANCELADO)
+    Devuelve resumen de viajes por empresa: viajes, días y días no exentos (ambos estados (EN_REVISION y REVISADO))
 
     Query Parameters:
     - ?include=empleados : Incluye desglose de empleados para cada empresa
@@ -53,12 +53,12 @@ class CompanyTripsSummaryView(APIView):
 
         # TODO: Implementar Prefetch aquí cuando include_empleados=True
 
-        # Base de viajes (todos excepto CANCELADO) por empresa
+        # Base de viajes (ambos estados (EN_REVISION y REVISADO)) por empresa
         viajes = Viaje.objects.filter(
             empleado__empresa=OuterRef('pk')
-        ).exclude(estado='CANCELADO')
+        )
 
-        # Subquery para trips (número de viajes, todos excepto CANCELADO)
+        # Subquery para trips (número de viajes, ambos estados (EN_REVISION y REVISADO))
         trips_sq = (
             viajes
             .order_by()
@@ -83,7 +83,7 @@ class CompanyTripsSummaryView(APIView):
                 viaje__empleado__empresa=OuterRef('pk'),
                 exento=True
             )
-            .exclude(viaje__estado='CANCELADO')
+            
             .order_by()
             .values('viaje__empleado__empresa')
             .annotate(count=Count('pk'))
@@ -97,7 +97,7 @@ class CompanyTripsSummaryView(APIView):
                 viaje__empleado__empresa=OuterRef('pk'),
                 exento=False
             )
-            .exclude(viaje__estado='CANCELADO')
+            
             .order_by()
             .values('viaje__empleado__empresa')
             .annotate(count=Count('pk'))
@@ -150,14 +150,14 @@ class CompanyTripsSummaryView(APIView):
         Obtiene estadísticas de empleados para una empresa específica
         Reutiliza la lógica de EmployeeTripsSummaryView
         """
-        # Subqueries para cada empleado (todos los estados excepto CANCELADO)
+        # Subqueries para cada empleado (ambos estados (EN_REVISION y REVISADO))
         viajes_qs = Viaje.objects.filter(
             empleado=OuterRef('pk')
-        ).exclude(estado='CANCELADO')
+        )
 
         dias_qs = DiaViaje.objects.filter(
             viaje__empleado=OuterRef('pk')
-        ).exclude(viaje__estado='CANCELADO')
+        )
 
         non_exentos_qs = dias_qs.filter(exento=False)
         exentos_qs = dias_qs.filter(exento=True)
@@ -208,7 +208,7 @@ class CompanyTripsSummaryView(APIView):
 
 class TripsPerMonthView(APIView):
     """
-    Número de viajes iniciados por mes (todos los estados excepto CANCELADO), filtrado según el rol
+    Número de viajes iniciados por mes (ambos estados (EN_REVISION y REVISADO)), filtrado según el rol
 
     Query Parameters:
     - ?year=2024 : Filtra viajes por año específico (ej: 2024, 2025)
@@ -218,7 +218,7 @@ class TripsPerMonthView(APIView):
 
     def get(self, request):
         user = request.user
-        viajes = Viaje.objects.exclude(estado='CANCELADO')
+        viajes = Viaje.objects.all()
 
         # Filtrado por rol
         if user.role == "EMPRESA":
@@ -288,7 +288,7 @@ class TripsTypeView(APIView):
         user = request.user
 
         # Base queryset
-        viajes = Viaje.objects.filter(estado='FINALIZADO')
+        viajes = Viaje.objects.filter(estado='REVISADO')
 
         # Filtrado por rol
         if user.role == "EMPRESA":
@@ -325,13 +325,13 @@ class TripsTypeView(APIView):
 
 
 class ExemptDaysView(APIView):
-    """Devuelve conteo de días exentos vs no exentos (viajes FINALIZADOS), filtrado por rol"""
+    """Devuelve conteo de días exentos vs no exentos (viajes REVISADOS), filtrado por rol"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        qs = DiaViaje.objects.filter(viaje__estado='FINALIZADO')
+        qs = DiaViaje.objects.filter(viaje__estado='REVISADO')
 
         # Filtrado por rol
         if user.role == "EMPRESA":
@@ -374,7 +374,7 @@ class GeneralInfoView(APIView):
         if user.role == "MASTER":
             companies = EmpresaProfile.objects.count()
             employees = EmpleadoProfile.objects.count()
-            viajes_qs = Viaje.objects.filter(estado='FINALIZADO')
+            viajes_qs = Viaje.objects.filter(estado='REVISADO')
 
         # EMPRESA: sólo su empresa
         elif user.role == "EMPRESA":
@@ -384,7 +384,7 @@ class GeneralInfoView(APIView):
             companies = 1
             employees = EmpleadoProfile.objects.filter(empresa=empresa).count()
             viajes_qs = Viaje.objects.filter(
-                estado='FINALIZADO',
+                estado='REVISADO',
                 empleado__empresa=empresa
             )
 
@@ -396,7 +396,7 @@ class GeneralInfoView(APIView):
             companies = 1
             employees = 1
             viajes_qs = Viaje.objects.filter(
-                estado='FINALIZADO',
+                estado='REVISADO',
                 empleado=empleado
             )
 
@@ -419,7 +419,7 @@ class GeneralInfoView(APIView):
 
 
 class EmployeeTripsSummaryView(APIView):
-    """Resumen por empleado: viajes, días y días no exentos (todos los estados excepto CANCELADO, solo para EMPRESA)"""
+    """Resumen por empleado: viajes, días y días no exentos (ambos estados (EN_REVISION y REVISADO), solo para EMPRESA)"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -433,14 +433,14 @@ class EmployeeTripsSummaryView(APIView):
         if not empresa:
             raise EmpresaProfileNotFoundError()
 
-        # Subqueries para cada empleado (todos los estados excepto CANCELADO)
+        # Subqueries para cada empleado (ambos estados (EN_REVISION y REVISADO))
         viajes_qs = Viaje.objects.filter(
             empleado=OuterRef('pk')
-        ).exclude(estado='CANCELADO')
+        )
 
         dias_qs = DiaViaje.objects.filter(
             viaje__empleado=OuterRef('pk')
-        ).exclude(viaje__estado='CANCELADO')
+        )
 
         non_exentos_qs = dias_qs.filter(exento=False)
         exentos_qs = dias_qs.filter(exento=True)
@@ -489,7 +489,7 @@ class EmployeeTripsSummaryView(APIView):
 
 
 class MasterCompanyEmployeesView(APIView):
-    """Permite a un usuario MASTER ver los viajes de empleados de una empresa específica (todos los estados excepto CANCELADO)"""
+    """Permite a un usuario MASTER ver los viajes de empleados de una empresa específica (ambos estados (EN_REVISION y REVISADO))"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -503,11 +503,11 @@ class MasterCompanyEmployeesView(APIView):
 
         viajes_qs = Viaje.objects.filter(
             empleado=OuterRef('pk')
-        ).exclude(estado='CANCELADO')
+        )
 
         dias_qs = DiaViaje.objects.filter(
             viaje__empleado=OuterRef('pk')
-        ).exclude(viaje__estado='CANCELADO')
+        )
 
         non_exentos_qs = dias_qs.filter(exento=False)
         exentos_qs = dias_qs.filter(exento=True)

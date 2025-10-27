@@ -1,3 +1,5 @@
+⚠️ **Estados actualizados**: Desde ahora solo se usan `EN_REVISION` y `REVISADO`. Las secciones que mencionan estados previos (`PENDIENTE`, `APROBADO`, `EN_CURSO`, `CANCELADO`) están en revisión y se consideran legacy.
+
 # Módulo de Viajes
 
 Este módulo gestiona el ciclo completo de viajes de negocio de los empleados, desde la solicitud inicial hasta la revisión final, incluyendo la gestión de días de viaje y gastos asociados.

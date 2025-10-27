@@ -194,8 +194,109 @@ class AuthenticationTestCase(TestCase):
         self.assertTrue(user_exists)
 
         # Verificar que se creó el perfil de empresa
-        empresa_exists = EmpresaProfile.objects.filter(nif='B98765432').exists()
-        self.assertTrue(empresa_exists)
+        empresa = EmpresaProfile.objects.filter(nif='B98765432').first()
+        self.assertIsNotNone(empresa)
+        self.assertFalse(empresa.permisos)
+
+    def test_register_user_empresa_with_autogestion_permissions(self):
+        """Test: Registro de empresa con permisos de autogestión"""
+        url = reverse('register')
+        data = {
+            'username': 'empresa_autogestion',
+            'email': 'autogestion@empresa.com',
+            'password': 'password123',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Autogestion',
+            'nif': 'B11223344',
+            'address': 'Calle Autogestión 1',
+            'city': 'Valencia',
+            'postal_code': '46001',
+            'correo_contacto': 'autogestion@empresa.com',
+            'permisos_autogestion': True
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        empresa = EmpresaProfile.objects.filter(nif='B11223344').first()
+        self.assertIsNotNone(empresa)
+        self.assertTrue(empresa.permisos)
+
+    def test_register_user_empleado_with_salary(self):
+        """Test: Registro de empleado permite asignar salario"""
+        url = reverse('register')
+        data = {
+            'username': 'empleado_salario',
+            'email': 'empleado.salario@test.com',
+            'password': 'password123',
+            'role': 'EMPLEADO',
+            'nombre': 'Empleado',
+            'apellido': 'Salario',
+            'empresa_id': self.empresa_profile.id,
+            'dni': '22334455K',
+            'salario': '34500.75'
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        empleado = EmpleadoProfile.objects.filter(dni='22334455K').first()
+        self.assertIsNotNone(empleado)
+        self.assertEqual(str(empleado.salario), '34500.75')
+
+    def test_register_user_empleado_with_invalid_empresa(self):
+        """Test: Registro de empleado con empresa inválida falla"""
+        url = reverse('register')
+        data = {
+            'username': 'empleado_invalido',
+            'email': 'empleado.invalido@test.com',
+            'password': 'password123',
+            'role': 'EMPLEADO',
+            'nombre': 'Empleado',
+            'apellido': 'Invalido',
+            'empresa_id': 9999,
+            'dni': '11223344P'
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('empresa_id', response.data)
+
+    def test_register_user_empleado_with_negative_salary(self):
+        """Test: Registro de empleado con salario negativo lanza error"""
+        url = reverse('register')
+        data = {
+            'username': 'empleado_negativo',
+            'email': 'empleado.negativo@test.com',
+            'password': 'password123',
+            'role': 'EMPLEADO',
+            'nombre': 'Empleado',
+            'apellido': 'Negativo',
+            'empresa_id': self.empresa_profile.id,
+            'dni': '33445566L',
+            'salario': '-1000'
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('salario', response.data)
+
+    def test_register_user_empleado_without_password_uses_default(self):
+        """Test: Registro de empleado sin password usa contraseña por defecto"""
+        url = reverse('register')
+        data = {
+            'username': 'empleado_sin_password',
+            'email': 'empleado.sinpass@test.com',
+            'role': 'EMPLEADO',
+            'nombre': 'Empleado',
+            'apellido': 'SinPass',
+            'empresa_id': self.empresa_profile.id,
+            'dni': '55667788M'
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = CustomUser.objects.get(username='empleado_sin_password')
+        self.assertTrue(user.check_password('empleado'))
 
     def test_register_user_duplicate_email(self):
         """Test: Registro con email duplicado falla"""

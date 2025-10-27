@@ -65,6 +65,7 @@ class EmpleadoProfile(models.Model):
     nombre = models.CharField(max_length=255)
     apellido = models.CharField(max_length=255)
     dni = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)  # 🔹 DNI único opcional
+    salario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=None)
 
     def clean(self):
         """Un empleado no puede pertenecer a más de una empresa"""
@@ -99,11 +100,8 @@ class Viaje(models.Model):
     """Modelo para manejar los viajes solicitados por empleados"""
 
     ESTADO_CHOICES = [
-        ("PENDIENTE", "Pendiente"),
-        ("EN_CURSO", "En curso"),
         ("EN_REVISION", "En revision"),
-        ("FINALIZADO", "Finalizado"),
-        ("CANCELADO", "Cancelado"),
+        ("REVISADO", "Revisado"),
     ]
 
     empleado = models.ForeignKey(EmpleadoProfile, on_delete=models.CASCADE)
@@ -114,7 +112,7 @@ class Viaje(models.Model):
     destino = models.CharField(max_length=255)
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
-    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="PENDIENTE")
+    estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="EN_REVISION")
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
     dias_viajados = models.PositiveIntegerField(default = 1)  # 🔹 Días de viaje
     empresa_visitada = models.CharField(max_length=255, null=True, blank=True)  # 🔹 Empresa visitada

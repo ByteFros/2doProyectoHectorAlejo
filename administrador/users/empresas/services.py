@@ -5,7 +5,8 @@ import csv
 import io
 import random
 import string
-from typing import Dict, List, Tuple
+from decimal import Decimal, InvalidOperation
+from typing import Dict, List, Optional
 from django.db import transaction
 from django.utils.text import slugify
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
@@ -155,7 +156,8 @@ def create_empleado(
     dni: str,
     email: str,  # Ahora es obligatorio
     username: str = None,
-    password: str = "empleado"
+    password: str = "empleado",
+    salario: Optional[Decimal] = None
 ) -> EmpleadoProfile:
     """
     Crea un nuevo empleado asociado a una empresa.
@@ -168,6 +170,7 @@ def create_empleado(
         email: Email del empleado (OBLIGATORIO)
         username: Username (se genera automáticamente si no se proporciona)
         password: Contraseña (default: "empleado")
+        salario: Salario bruto anual del empleado (opcional)
 
     Returns:
         EmpleadoProfile creado
@@ -214,7 +217,8 @@ def create_empleado(
         empresa=empresa,
         nombre=nombre,
         apellido=apellido,
-        dni=dni_normalized  # Guardar DNI normalizado
+        dni=dni_normalized,  # Guardar DNI normalizado
+        salario=salario
     )
 
     return empleado
@@ -272,19 +276,38 @@ def process_employee_csv(
     errores = []
 
     # Decodificar archivo
-    decoded_file = csv_file.read().decode("utf-8").splitlines()
-    reader = csv.reader(decoded_file)
-    next(reader, None)  # Saltar encabezados
+    decoded_file = csv_file.read().decode("utf-8-sig")
+    lines = decoded_file.splitlines()
+    reader = csv.DictReader(lines)
+
+    if not reader.fieldnames:
+        return {
+            "empleados_registrados": [],
+            "empleados_omitidos": [],
+            "errores": [{"error": "El archivo CSV está vacío o no tiene encabezados"}]
+        }
+
+    header_map = {header.strip().lower(): header for header in reader.fieldnames if header}
+    required_headers = {'nombre', 'apellido', 'dni', 'email'}
+    missing = required_headers - set(header_map.keys())
+    if missing:
+        return {
+            "empleados_registrados": [],
+            "empleados_omitidos": [],
+            "errores": [{
+                "error": f"Faltan columnas obligatorias: {', '.join(sorted(missing))}"
+            }]
+        }
+
+    salario_header = header_map.get('salario')
 
     with transaction.atomic():
         for row in reader:
             try:
-                # Parsear row
-                if len(row) < 4:
-                    errores.append({"row": row, "error": "Formato inválido. Se requiere: nombre,apellido,dni,email"})
-                    continue
-
-                nombre, apellido, dni, email = row[0], row[1], row[2], row[3]
+                nombre = row.get(header_map['nombre'], '').strip()
+                apellido = row.get(header_map['apellido'], '').strip()
+                dni = row.get(header_map['dni'], '').strip()
+                email = row.get(header_map['email'], '').strip()
 
                 # Validaciones básicas
                 if not nombre or not apellido or not dni or not email:
@@ -314,14 +337,27 @@ def process_employee_csv(
                 base = f"{nombre}{apellido}"
                 username = generate_unique_username(base)
 
-                # Crear empleado
+                salario = None
+                if salario_header:
+                    salario_raw = row.get(salario_header, '').strip()
+                    if salario_raw:
+                        try:
+                            salario = Decimal(salario_raw)
+                        except (InvalidOperation, ValueError):
+                            errores.append({"dni": dni, "error": f"Salario inválido: '{salario_raw}'"})
+                            continue
+                        if salario < 0:
+                            errores.append({"dni": dni, "error": "El salario debe ser un número positivo"})
+                            continue
+
                 empleado = create_empleado(
                     empresa=empresa,
                     nombre=nombre,
                     apellido=apellido,
                     dni=dni_normalized,
                     email=email,
-                    username=username
+                    username=username,
+                    salario=salario
                 )
 
                 empleados_registrados.append(empleado)

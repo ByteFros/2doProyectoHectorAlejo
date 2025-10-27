@@ -1,3 +1,5 @@
+⚠️ **Nota de transición**: Este análisis describe el flujo legacy de estados (`PENDIENTE`, `APROBADO`, `EN_CURSO`, `CANCELADO`, `FINALIZADO`). El sistema actual solo trabaja con `EN_REVISION` y `REVISADO`. Actualizaremos los ejemplos próximamente.
+
 # Análisis de Lógica: Viajes, Días y Gastos
 
 ## Estado Actual de la Implementación

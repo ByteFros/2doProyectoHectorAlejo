@@ -37,7 +37,7 @@ class ExportMasterCSVView(APIView):
         if request.user.role != "MASTER":
             raise UnauthorizedAccessError("Solo MASTER puede exportar todos los viajes")
 
-        viajes = Viaje.objects.filter(estado="FINALIZADO").select_related(
+        viajes = Viaje.objects.filter(estado="REVISADO").select_related(
             "empresa", "empleado"
         )
 
@@ -64,7 +64,7 @@ class ExportEmpresaCSVView(APIView):
             raise EmpresaProfileNotFoundError()
 
         viajes = Viaje.objects.filter(
-            empresa=empresa, estado="FINALIZADO"
+            empresa=empresa, estado="REVISADO"
         ).select_related("empleado")
 
         csv_content = generar_csv_viajes_empresa(viajes)

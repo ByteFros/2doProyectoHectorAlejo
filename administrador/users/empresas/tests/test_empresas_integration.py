@@ -213,13 +213,15 @@ class EmpleadoViewSetIntegrationTest(TestCase):
             "nombre": "Juan",
             "apellido": "Perez",
             "dni": "12345678Z",
-            "email": "juan.perez@test.com"
+            "email": "juan.perez@test.com",
+            "salario": "25000.50"
         }
 
         response = self.client.post(f'{API_BASE_URL}/empleados/', data, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(EmpleadoProfile.objects.filter(dni="12345678Z").exists())
+        self.assertEqual(response.data['salario'], '25000.50')
 
     def test_create_empleado_con_dni_invalido(self):
         """Test POST /empleados/ - DNI inválido"""
@@ -289,6 +291,8 @@ class EmpleadoViewSetIntegrationTest(TestCase):
         response = self.client.get(f'{API_BASE_URL}/empleados/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+        self.assertIn('salario', response.data[0])
+        self.assertIsNone(response.data[0]['salario'])
 
     def test_retrieve_empleado(self):
         """Test GET /empleados/{id}/ - Obtener detalle de empleado"""
@@ -311,6 +315,7 @@ class EmpleadoViewSetIntegrationTest(TestCase):
         response = self.client.get(f'{API_BASE_URL}/empleados/{empleado.id}/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['nombre'], "Juan")
+        self.assertIn('salario', response.data)
 
     def test_delete_empleado(self):
         """Test DELETE /empleados/{id}/ - Eliminar empleado"""
@@ -342,6 +347,14 @@ class BatchEmployeeUploadIntegrationTest(TestCase):
         """Configuración inicial"""
         self.client = APIClient()
 
+        self.master_user = CustomUser.objects.create_user(
+            username="master_batch",
+            email="master_batch@test.com",
+            password="password123",
+            role="MASTER"
+        )
+        self.master_token = Token.objects.create(user=self.master_user)
+
         # Crear empresa
         self.empresa_user = CustomUser.objects.create_user(
             username="empresa_test",
@@ -361,9 +374,9 @@ class BatchEmployeeUploadIntegrationTest(TestCase):
         """Test POST /empleados/batch-upload/ - CSV válido"""
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.empresa_token.key}')
 
-        csv_content = """nombre,apellido,dni,email
-Juan,Perez,55495559D,juan.perez@test.com
-Maria,Garcia,12345678Z,maria.garcia@test.com"""
+        csv_content = """nombre,apellido,dni,email,salario
+Juan,Perez,55495559D,juan.perez@test.com,28000
+Maria,Garcia,12345678Z,maria.garcia@test.com,30500.50"""
 
         csv_file = io.BytesIO(csv_content.encode('utf-8'))
         csv_file.name = 'empleados.csv'
@@ -373,13 +386,16 @@ Maria,Garcia,12345678Z,maria.garcia@test.com"""
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(len(response.data['empleados_registrados']), 2)
         self.assertEqual(len(response.data['errores']), 0)
+        salarios = {emp['dni']: emp['salario'] for emp in response.data['empleados_registrados']}
+        self.assertEqual(salarios['55495559D'], '28000.00')
+        self.assertEqual(salarios['12345678Z'], '30500.50')
 
     def test_batch_upload_dni_invalido(self):
         """Test POST /empleados/batch-upload/ - DNI inválido"""
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.empresa_token.key}')
 
-        csv_content = """nombre,apellido,dni,email
-Juan,Perez,55495559A,juan.perez@test.com"""  # Letra incorrecta (debería ser D)
+        csv_content = """nombre,apellido,dni,email,salario
+Juan,Perez,55495559A,juan.perez@test.com,25000"""  # Letra incorrecta (debería ser D)
 
         csv_file = io.BytesIO(csv_content.encode('utf-8'))
         csv_file.name = 'empleados.csv'
@@ -389,6 +405,44 @@ Juan,Perez,55495559A,juan.perez@test.com"""  # Letra incorrecta (debería ser D)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(len(response.data['empleados_registrados']), 0)
         self.assertGreater(len(response.data['errores']), 0)
+
+    def test_batch_upload_master_con_empresa_id(self):
+        """MASTER puede cargar empleados indicando empresa_id"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        csv_content = """nombre,apellido,dni,email,salario
+Ana,López,44556677L,ana.lopez@test.com,31000
+Luis,Ruiz,55667788Z,luis.ruiz@test.com,33000"""
+
+        csv_file = io.BytesIO(csv_content.encode('utf-8'))
+        csv_file.name = 'empleados.csv'
+
+        response = self.client.post(
+            f'{API_BASE_URL}/empleados/batch-upload/',
+            {'file': csv_file, 'empresa_id': self.empresa_profile.id},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(response.data['empleados_registrados']), 2)
+        empleados = EmpleadoProfile.objects.filter(empresa=self.empresa_profile)
+        self.assertEqual(empleados.count(), 2)
+
+    def test_batch_upload_master_sin_empresa_id(self):
+        """MASTER sin empresa_id recibe error 400"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        csv_content = "nombre,apellido,dni,email\nAna,López,44556677B,ana.lopez@test.com"
+        csv_file = io.BytesIO(csv_content.encode('utf-8'))
+        csv_file.name = 'empleados.csv'
+
+        response = self.client.post(
+            f'{API_BASE_URL}/empleados/batch-upload/',
+            {'file': csv_file},
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class PendingReviewsIntegrationTest(TestCase):
@@ -468,6 +522,60 @@ class PendingReviewsIntegrationTest(TestCase):
             motivo="Reunión comercial"
         )
 
+        self.viaje_extra = Viaje.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            destino="Barcelona",
+            ciudad="Barcelona",
+            pais="España",
+            fecha_inicio=date(2024, 2, 10),
+            fecha_fin=date(2024, 2, 12),
+            estado="EN_REVISION",
+            dias_viajados=3,
+            empresa_visitada="Cliente DEF",
+            motivo="Seguimiento"
+        )
+
+        # Empresa adicional con viaje en revisión para validar filtro por empresa
+        self.otra_empresa_user = CustomUser.objects.create_user(
+            username="otra_empresa",
+            email="otra@empresa.com",
+            password="pass",
+            role="EMPRESA"
+        )
+        self.otra_empresa_profile = EmpresaProfile.objects.create(
+            user=self.otra_empresa_user,
+            nombre_empresa="Otra SA",
+            nif="B98765432",
+            correo_contacto="otra@empresa.com",
+            permisos=True
+        )
+        otro_empleado = EmpleadoProfile.objects.create(
+            user=CustomUser.objects.create_user(
+                username="empleado_otro",
+                email="empleado_otro@test.com",
+                password="pass",
+                role="EMPLEADO"
+            ),
+            empresa=self.otra_empresa_profile,
+            nombre="Luis",
+            apellido="Lopez",
+            dni="98765432Z"
+        )
+        Viaje.objects.create(
+            empleado=otro_empleado,
+            empresa=self.otra_empresa_profile,
+            destino="Sevilla",
+            ciudad="Sevilla",
+            pais="España",
+            fecha_inicio=date(2024, 3, 1),
+            fecha_fin=date(2024, 3, 4),
+            estado="EN_REVISION",
+            dias_viajados=4,
+            empresa_visitada="Cliente GHI",
+            motivo="Instalación"
+        )
+
     def test_pending_master_puede_ver(self):
         """Test GET /empleados/pending/ - MASTER puede ver todos"""
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
@@ -475,10 +583,10 @@ class PendingReviewsIntegrationTest(TestCase):
         response = self.client.get(f'{API_BASE_URL}/empleados/pending/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['nombre'], "Juan")
-        self.assertIn('viajes_pendientes', response.data[0])
-        self.assertEqual(len(response.data[0]['viajes_pendientes']), 1)
+        self.assertEqual(len(response.data), 2)
+        nombres = {item['nombre'] for item in response.data}
+        self.assertIn("Juan", nombres)
+        self.assertIn("Luis", nombres)
 
     def test_pending_empresa_con_permisos_puede_ver(self):
         """Test GET /empleados/pending/ - EMPRESA con permisos=True puede ver"""
@@ -504,12 +612,32 @@ class PendingReviewsIntegrationTest(TestCase):
         response = self.client.get(f'{API_BASE_URL}/empleados/pending/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        viaje_data = response.data[0]['viajes_pendientes'][0]
+        # Buscar al empleado Juan y validar sus dos viajes
+        juan = next((item for item in response.data if item['nombre'] == 'Juan'), None)
+        self.assertIsNotNone(juan)
+        self.assertEqual(len(juan['viajes_pendientes']), 2)
 
-        self.assertEqual(viaje_data['destino'], "Madrid")
-        self.assertEqual(viaje_data['estado'], "EN_REVISION")
-        self.assertEqual(viaje_data['dias_viajados'], 5)
-        self.assertEqual(viaje_data['empresa_visitada'], "Cliente ABC")
+        destinos = {v['destino'] for v in juan['viajes_pendientes']}
+        self.assertEqual(destinos, {"Madrid", "Barcelona"})
+
+    def test_pending_master_filtra_por_empresa(self):
+        """Test GET /empleados/pending/?empresa=ID - filtra por empresa"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        response = self.client.get(f'{API_BASE_URL}/empleados/pending/?empresa={self.empresa_profile.id}')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+        # Asegurar que solo se incluyen viajes de la empresa solicitada
+        destinos = {viaje['destino'] for viaje in response.data[0]['viajes_pendientes']}
+        self.assertEqual(destinos, {"Madrid", "Barcelona"})
+
+        # Al pedir otra empresa, debe devolver los viajes correspondientes
+        response_otro = self.client.get(f'{API_BASE_URL}/empleados/pending/?empresa={self.otra_empresa_profile.id}')
+        self.assertEqual(response_otro.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_otro.data), 1)
+        self.assertEqual(response_otro.data[0]['viajes_pendientes'][0]['destino'], "Sevilla")
 
 
 class AuthorizationIntegrationTest(TestCase):

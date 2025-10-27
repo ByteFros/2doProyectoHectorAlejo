@@ -354,12 +354,12 @@ def obtener_viajes_para_exportacion(usuario, empleado_id: int = None):
         empleado = EmpleadoProfile.objects.get(id=empleado_id)
         viajes = Viaje.objects.filter(
             empleado=empleado
-        ).exclude(estado="CANCELADO").prefetch_related('dias__gastos')
+        ).prefetch_related('dias__gastos')
         filename_base = f"{empleado.nombre}_{empleado.apellido}"
         return viajes, filename_base
 
     if usuario.role == "MASTER":
-        viajes = Viaje.objects.exclude(estado="CANCELADO").select_related(
+        viajes = Viaje.objects.select_related(
             'empresa', 'empleado'
         ).prefetch_related('dias__gastos')
         return viajes, "todos_los_viajes"
@@ -368,7 +368,7 @@ def obtener_viajes_para_exportacion(usuario, empleado_id: int = None):
         empresa = EmpresaProfile.objects.get(user=usuario)
         viajes = Viaje.objects.filter(
             empresa=empresa
-        ).exclude(estado="CANCELADO").select_related(
+        ).select_related(
             'empleado'
         ).prefetch_related('dias__gastos')
         return viajes, safe_filename(empresa.nombre_empresa)
@@ -377,7 +377,7 @@ def obtener_viajes_para_exportacion(usuario, empleado_id: int = None):
         empleado = EmpleadoProfile.objects.get(user=usuario)
         viajes = Viaje.objects.filter(
             empleado=empleado
-        ).exclude(estado="CANCELADO").prefetch_related('dias__gastos')
+        ).prefetch_related('dias__gastos')
         return viajes, f"{empleado.nombre}_{empleado.apellido}"
 
     return Viaje.objects.none(), "sin_datos"

@@ -27,7 +27,7 @@ class EmpleadoNestedSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username', 'salario']
         read_only_fields = fields
 
 
@@ -66,7 +66,7 @@ class EmpleadoWithViajesSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username',
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'username', 'salario',
                   'empresa', 'viajes', 'viajes_count']
         read_only_fields = fields
 
@@ -109,6 +109,7 @@ class EmpleadoCreateSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)  # Ahora es obligatorio
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, default="empleado")
+    salario = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
 
     def validate_dni(self, value):
         """Validar que el DNI/NIE/NIF no esté duplicado"""
@@ -134,6 +135,13 @@ class EmpleadoCreateSerializer(serializers.Serializer):
 class BatchEmployeeUploadSerializer(serializers.Serializer):
     """Serializer para validar archivo CSV"""
     file = serializers.FileField(required=True)
+    empresa_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def __init__(self, *args, **kwargs):
+        require_empresa_id = kwargs.pop('require_empresa_id', False)
+        super().__init__(*args, **kwargs)
+        if require_empresa_id:
+            self.fields['empresa_id'].required = True
 
     def validate_file(self, value):
         """Validar que sea un archivo CSV"""

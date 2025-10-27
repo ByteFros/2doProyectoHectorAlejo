@@ -19,16 +19,9 @@ from users.common.exceptions import (
 
 from .services import (
     validar_fechas,
-    validar_conflicto_viajes,
     crear_viaje,
-    iniciar_viaje,
-    finalizar_viaje,
-    cancelar_viaje,
-    aprobar_rechazar_viaje,
     procesar_revision_viaje,
-    obtener_viaje_en_curso,
-    obtener_estadisticas_ciudades,
-    tiene_viaje_en_curso
+    obtener_estadisticas_ciudades
 )
 
 
@@ -54,13 +47,6 @@ class CrearViajeView(APIView):
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validar conflictos
-        if validar_conflicto_viajes(empleado, fecha_inicio, fecha_fin):
-            return Response(
-                {"error": "Ya tienes un viaje programado en esas fechas."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         # Crear viaje
         try:
             viaje = crear_viaje(
@@ -85,149 +71,8 @@ class CrearViajeView(APIView):
             )
 
 
-class VerificarViajeEnCursoView(APIView):
-    """Verifica si un usuario tiene un viaje en curso"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        if request.user.role != "EMPLEADO":
-            raise UnauthorizedAccessError("Solo empleados pueden acceder")
-
-        empleado = get_user_empleado(request.user)
-        if not empleado:
-            raise EmpleadoProfileNotFoundError()
-
-        tiene_viaje = tiene_viaje_en_curso(empleado)
-        return Response(
-            {"tiene_viaje_en_curso": tiene_viaje},
-            status=status.HTTP_200_OK
-        )
-
-
-class AprobarRechazarViajeView(APIView):
-    """Permite a una empresa aprobar o rechazar un viaje"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, viaje_id):
-        if request.user.role != "EMPRESA":
-            raise UnauthorizedAccessError("Solo empresas pueden aprobar/rechazar viajes")
-
-        empresa = get_user_empresa(request.user)
-        if not empresa:
-            raise EmpresaProfileNotFoundError()
-
-        viaje = get_object_or_404(Viaje, id=viaje_id)
-
-        # Verificar que el viaje pertenece a la empresa
-        if viaje.empresa != empresa:
-            raise UnauthorizedAccessError("Este viaje no pertenece a tu empresa")
-
-        # Aprobar o rechazar
-        nuevo_estado = request.data.get("estado")
-        motivo = request.data.get("motivo", "")
-
-        try:
-            aprobar_rechazar_viaje(viaje, nuevo_estado, motivo)
-            return Response(
-                {"message": f"Viaje {nuevo_estado.lower()} correctamente."},
-                status=status.HTTP_200_OK
-            )
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class IniciarViajeView(APIView):
-    """Permite a un empleado iniciar un viaje aprobado"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, viaje_id):
-        if request.user.role != "EMPLEADO":
-            raise UnauthorizedAccessError("Solo empleados pueden iniciar viajes")
-
-        viaje = get_object_or_404(Viaje, id=viaje_id, empleado__user=request.user)
-
-        try:
-            iniciar_viaje(viaje)
-            return Response(
-                {"message": "Viaje iniciado correctamente"},
-                status=status.HTTP_200_OK
-            )
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class FinalizarViajeView(APIView):
-    """Permite al empleado finalizar su viaje y pasar a estado de revisión"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, viaje_id):
-        if request.user.role != 'EMPLEADO':
-            raise UnauthorizedAccessError("Solo empleados pueden finalizar viajes")
-
-        viaje = get_object_or_404(Viaje, id=viaje_id, empleado__user=request.user)
-
-        try:
-            finalizar_viaje(viaje)
-            return Response(
-                {'message': 'Viaje en revisión. Un supervisor procederá a validar los días.'},
-                status=status.HTTP_200_OK
-            )
-        except ValueError as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class CancelarViajeView(APIView):
-    """Permite a un empleado cancelar un viaje antes de que comience"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, viaje_id):
-        if request.user.role != "EMPLEADO":
-            raise UnauthorizedAccessError("Solo empleados pueden cancelar viajes")
-
-        viaje = get_object_or_404(Viaje, id=viaje_id, empleado__user=request.user)
-
-        try:
-            cancelar_viaje(viaje)
-            return Response(
-                {"message": "Viaje cancelado correctamente."},
-                status=status.HTTP_200_OK
-            )
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ViajeEnCursoView(APIView):
-    """Devuelve el viaje actual en curso del empleado autenticado"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        if request.user.role != "EMPLEADO":
-            raise UnauthorizedAccessError("Solo empleados pueden acceder")
-
-        empleado = get_user_empleado(request.user)
-        if not empleado:
-            raise EmpleadoProfileNotFoundError()
-
-        viaje_en_curso = obtener_viaje_en_curso(empleado)
-
-        if not viaje_en_curso:
-            return Response(
-                {"message": "No hay viajes en curso."},
-                status=status.HTTP_204_NO_CONTENT
-            )
-
-        serializer = ViajeSerializer(viaje_en_curso)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class ListarViajesFinalizadosView(APIView):
-    """Lista los viajes finalizados según el rol del usuario"""
+class ListarViajesRevisadosView(APIView):
+    """Lista los viajes revisados según el rol del usuario"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -235,7 +80,7 @@ class ListarViajesFinalizadosView(APIView):
         user = request.user
 
         if user.role == "MASTER":
-            viajes = Viaje.objects.filter(estado="FINALIZADO").exclude(estado="CANCELADO")
+            viajes = Viaje.objects.filter(estado="REVISADO")
 
         elif user.role == "EMPRESA":
             empresa = get_user_empresa(user)
@@ -243,8 +88,8 @@ class ListarViajesFinalizadosView(APIView):
                 raise EmpresaProfileNotFoundError()
             viajes = Viaje.objects.filter(
                 empleado__empresa=empresa,
-                estado="FINALIZADO"
-            ).exclude(estado="CANCELADO")
+                estado="REVISADO"
+            )
 
         elif user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
@@ -252,8 +97,8 @@ class ListarViajesFinalizadosView(APIView):
                 raise EmpleadoProfileNotFoundError()
             viajes = Viaje.objects.filter(
                 empleado=empleado,
-                estado="FINALIZADO"
-            ).exclude(estado="CANCELADO")
+                estado="REVISADO"
+            )
 
         else:
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
@@ -291,7 +136,7 @@ class PendingTripsByEmployeeView(APIView):
         viajes = Viaje.objects.filter(
             empleado=empleado,
             estado='EN_REVISION'
-        ).exclude(estado='CANCELADO')
+        )
 
         serializer = PendingTripSerializer(viajes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -306,7 +151,7 @@ class ListarTodosLosViajesView(APIView):
         user = request.user
 
         if user.role == "MASTER":
-            viajes = Viaje.objects.exclude(estado="CANCELADO")
+            viajes = Viaje.objects.all()
 
         elif user.role == "EMPRESA":
             empresa = get_user_empresa(user)
@@ -314,13 +159,13 @@ class ListarTodosLosViajesView(APIView):
                 raise EmpresaProfileNotFoundError()
             viajes = Viaje.objects.filter(
                 empleado__empresa=empresa
-            ).exclude(estado="CANCELADO")
+            )
 
         elif user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             if not empleado:
                 raise EmpleadoProfileNotFoundError()
-            viajes = Viaje.objects.filter(empleado=empleado).exclude(estado="CANCELADO")
+            viajes = Viaje.objects.filter(empleado=empleado)
 
         else:
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
@@ -349,12 +194,12 @@ class PendingTripsDetailView(APIView):
             viajes_qs = Viaje.objects.filter(
                 empleado_id=empleado_id,
                 estado="EN_REVISION"
-            ).exclude(estado="CANCELADO")
+            )
 
         else:
             # Sin filtro, cae en la lógica global
             if user.role == "MASTER":
-                viajes_qs = Viaje.objects.filter(estado="EN_REVISION").exclude(estado="CANCELADO")
+                viajes_qs = Viaje.objects.filter(estado="EN_REVISION")
 
             elif user.role == "EMPRESA":
                 empresa = get_user_empresa(user)
@@ -363,7 +208,7 @@ class PendingTripsDetailView(APIView):
                 viajes_qs = Viaje.objects.filter(
                     empleado__empresa=empresa,
                     estado="EN_REVISION"
-                ).exclude(estado="CANCELADO")
+                )
 
             else:  # EMPLEADO
                 empleado = get_user_empleado(user)
@@ -372,7 +217,7 @@ class PendingTripsDetailView(APIView):
                 viajes_qs = Viaje.objects.filter(
                     empleado=empleado,
                     estado="EN_REVISION"
-                ).exclude(estado="CANCELADO")
+                )
 
         serializer = PendingTripSerializer(viajes_qs, many=True)
         return Response({
@@ -414,7 +259,7 @@ class FinalizarRevisionViajeView(APIView):
 
 
 class EmployeeCityStatsView(APIView):
-    """Devuelve estadísticas de ciudades visitadas por un empleado (viajes finalizados)"""
+    """Devuelve estadísticas de ciudades visitadas por un empleado (viajes revisados)"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -488,7 +333,7 @@ class DiaViajeUpdateView(APIView):
 
         # Si todos los días están revisados, finalizar el viaje
         if not viaje.dias.filter(revisado=False).exists():
-            viaje.estado = 'FINALIZADO'
+            viaje.estado = 'REVISADO'
             viaje.save()
 
         return Response({'message': 'Día validado correctamente.'}, status=status.HTTP_200_OK)

@@ -18,10 +18,10 @@ def validar_viaje_para_gasto(viaje: Viaje) -> None:
         viaje: Viaje a validar
 
     Raises:
-        ValueError: Si el viaje está cancelado
+        ValueError: Si el viaje ya fue revisado
     """
-    if viaje.estado == "CANCELADO":
-        raise ValueError("No puedes registrar gastos en viajes cancelados")
+    if viaje.estado == "REVISADO":
+        raise ValueError("No puedes registrar gastos en viajes revisados")
 
 
 def validar_estado_gasto(estado: str) -> None:
@@ -67,7 +67,7 @@ def crear_gasto(
         Gasto creado
 
     Raises:
-        ValueError: Si el viaje está cancelado
+        ValueError: Si el viaje ya fue revisado
     """
     # Validar viaje
     validar_viaje_para_gasto(viaje)

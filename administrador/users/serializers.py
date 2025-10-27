@@ -27,7 +27,7 @@ class EmpleadoProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username', 'salario']
 
 
 class GastoSerializer(serializers.ModelSerializer):
@@ -171,7 +171,7 @@ class ViajeSerializer(serializers.ModelSerializer):
             destino=validated_data.get('destino'),
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            estado='PENDIENTE'
+            estado='EN_REVISION'
         ).exists()
         if existe:
             raise serializers.ValidationError(
@@ -259,7 +259,7 @@ class ViajeSerializer(serializers.ModelSerializer):
                 destino=destino,
                 fecha_inicio=fecha_inicio,
                 fecha_fin=fecha_fin,
-                estado='PENDIENTE'
+                estado='EN_REVISION'
         ).exists():
             raise serializers.ValidationError(
                 {'error': 'Ya existe un viaje pendiente a este destino en estas fechas para la empresa.'}

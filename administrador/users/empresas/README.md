@@ -88,7 +88,8 @@ GET /api/users/empleados/?search=Juan&include=viajes
       "apellido": "Pérez",
       "dni": "12345678A",
       "email": "juan@acme.com",
-      "username": "juan.perez"
+      "username": "juan.perez",
+      "salario": 28000.0
     },
     {
       "id": 11,
@@ -96,7 +97,8 @@ GET /api/users/empleados/?search=Juan&include=viajes
       "apellido": "García",
       "dni": "87654321B",
       "email": "maria@acme.com",
-      "username": "maria.garcia"
+      "username": "maria.garcia",
+      "salario": 26500.0
     }
   ]
 }
@@ -112,6 +114,7 @@ GET /api/users/empleados/?search=Juan&include=viajes
   "dni": "12345678A",
   "email": "juan@acme.com",
   "username": "juan.perez",
+  "salario": 28000.0,
   "empresa": {
     "id": 1,
     "nombre_empresa": "Acme Corp",
@@ -341,7 +344,8 @@ GET /empleados/?search=Juan&include=viajes
       "id": 20,
       "email": "juan.perez@acme.com",
       "username": "juan.perez"
-    }
+    },
+    "salario": 28000.0
   }
 ]
 ```
@@ -364,7 +368,8 @@ Crea un nuevo empleado.
   "dni": "12345678Z",
   "email": "juan.perez@acme.com",
   "username": "juan.perez",
-  "password": "empleado123"
+  "password": "empleado123",
+  "salario": 28000.0
 }
 ```
 
@@ -377,7 +382,8 @@ Crea un nuevo empleado.
   "email": "juan.perez@acme.com",
   "empresa_id": 1,
   "username": "juan.perez",
-  "password": "empleado123"
+  "password": "empleado123",
+  "salario": 28000.0
 }
 ```
 
@@ -435,21 +441,25 @@ Elimina un empleado y su usuario asociado.
 Carga masiva de empleados desde un archivo CSV.
 
 **Permisos:**
-- ❌ MASTER: No disponible (crear empleados individualmente)
+- ✅ MASTER: Puede cargar empleados indicando `empresa_id`
 - ✅ EMPRESA: Puede cargar empleados para su empresa
 - ❌ EMPLEADO: No autorizado
 
 **Body (multipart/form-data):**
 ```
 file: archivo.csv
+empresa_id: 3   # Obligatorio solo para MASTER
 ```
 
 **Formato CSV esperado:**
 ```csv
-nombre,apellido,dni,email
-Juan,Pérez,12345678Z,juan@empresa.com
-María,García,87654321A,maria@empresa.com
+nombre,apellido,dni,email,salario
+Juan,Pérez,12345678Z,juan@empresa.com,28000
+María,García,87654321A,maria@empresa.com,29500.75
 ```
+
+- La columna `salario` es opcional; si se omite o queda vacía, el empleado se crea sin salario.
+- Si se proporciona, debe ser un número positivo (se admite decimal con punto).
 
 **Respuesta:**
 ```json
@@ -477,7 +487,7 @@ María,García,87654321A,maria@empresa.com
 **Comportamiento:**
 - Los empleados duplicados (por DNI o email) se omiten automáticamente
 - Los empleados válidos se crean con password por defecto: "empleado"
-- Se asignan automáticamente a la empresa del usuario autenticado
+- Se asignan automáticamente a la empresa del usuario autenticado (o a la indicada por MASTER)
 
 ---
 
