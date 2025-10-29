@@ -378,7 +378,7 @@ def process_employee_csv(
 
 def get_companies_with_pending_reviews() -> 'QuerySet[EmpresaProfile]':
     """
-    Obtiene empresas que tienen empleados con viajes en estado EN_REVISION.
+    Obtiene empresas que tienen empleados con viajes en estado EN_REVISION, REABIERTO o REVISADO.
 
     Returns:
         QuerySet de EmpresaProfile
@@ -389,13 +389,13 @@ def get_companies_with_pending_reviews() -> 'QuerySet[EmpresaProfile]':
             print(f"{empresa.nombre_empresa} tiene viajes pendientes")
     """
     return EmpresaProfile.objects.filter(
-        empleados__viaje__estado='EN_REVISION'
+        empleados__viaje__estado__in=['EN_REVISION', 'REABIERTO', 'REVISADO']
     ).distinct()
 
 
 def get_employees_with_pending_reviews(empresa: EmpresaProfile) -> 'QuerySet[EmpleadoProfile]':
     """
-    Obtiene empleados de una empresa que tienen viajes en estado EN_REVISION.
+    Obtiene empleados de una empresa que tienen viajes en estado EN_REVISION, REABIERTO o REVISADO.
 
     Args:
         empresa: Empresa a filtrar
@@ -410,5 +410,5 @@ def get_employees_with_pending_reviews(empresa: EmpresaProfile) -> 'QuerySet[Emp
     """
     return EmpleadoProfile.objects.filter(
         empresa=empresa,
-        viaje__estado='EN_REVISION'
+        viaje__estado__in=['EN_REVISION', 'REABIERTO', 'REVISADO']
     ).distinct()

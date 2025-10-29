@@ -8,8 +8,7 @@ from .views import (
     PendingTripsByEmployeeView,
     ListarTodosLosViajesView,
     PendingTripsDetailView,
-    FinalizarRevisionViajeView,
-    ReabrirViajeView,
+    CambiarEstadoViajeView,
     EmployeeCityStatsView,
     DiaViajeListView,
     DiaViajeReviewView
@@ -18,9 +17,7 @@ from .views import (
 urlpatterns = [
     # Gestión de viajes
     path('viajes/new/', CrearViajeView.as_view(), name='nuevo_viaje'),
-    path('viajes/<int:viaje_id>/finalizar_revision/', FinalizarRevisionViajeView.as_view(),
-         name='finalizar_revision_viaje'),
-    path('viajes/<int:viaje_id>/reabrir/', ReabrirViajeView.as_view(), name='reabrir_viaje'),
+    path('viajes/<int:viaje_id>/transition/', CambiarEstadoViajeView.as_view(), name='viaje_transition'),
 
     # Listado de viajes
     path('viajes/revisados/', ListarViajesRevisadosView.as_view(), name='viajes-revisados'),

@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje, Gasto
+from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje
 from users.serializers import ViajeSerializer, PendingTripSerializer, DiaViajeSerializer
 from users.common.services import get_user_empleado, get_user_empresa
 from users.common.exceptions import (
@@ -20,8 +20,8 @@ from users.common.exceptions import (
 from .services import (
     validar_fechas,
     crear_viaje,
-    procesar_revision_viaje,
-    obtener_estadisticas_ciudades
+    obtener_estadisticas_ciudades,
+    cambiar_estado_viaje
 )
 
 
@@ -135,7 +135,7 @@ class PendingTripsByEmployeeView(APIView):
         # Obtener viajes en revisión
         viajes = Viaje.objects.filter(
             empleado=empleado,
-            estado='EN_REVISION'
+            estado__in=['EN_REVISION', 'REABIERTO']
         )
 
         serializer = PendingTripSerializer(viajes, many=True)
@@ -175,7 +175,7 @@ class ListarTodosLosViajesView(APIView):
 
 
 class PendingTripsDetailView(APIView):
-    """Devuelve count + lista de viajes 'EN_REVISION', opcionalmente filtrado por empleado"""
+    """Devuelve count + lista de viajes 'EN_REVISION' o 'REABIERTO', opcionalmente filtrado por empleado"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -193,13 +193,13 @@ class PendingTripsDetailView(APIView):
 
             viajes_qs = Viaje.objects.filter(
                 empleado_id=empleado_id,
-                estado="EN_REVISION"
+                estado__in=["EN_REVISION", "REABIERTO"]
             )
 
         else:
             # Sin filtro, cae en la lógica global
             if user.role == "MASTER":
-                viajes_qs = Viaje.objects.filter(estado="EN_REVISION")
+                viajes_qs = Viaje.objects.filter(estado__in=["EN_REVISION", "REABIERTO"])
 
             elif user.role == "EMPRESA":
                 empresa = get_user_empresa(user)
@@ -207,17 +207,19 @@ class PendingTripsDetailView(APIView):
                     raise EmpresaProfileNotFoundError()
                 viajes_qs = Viaje.objects.filter(
                     empleado__empresa=empresa,
-                    estado="EN_REVISION"
+                    estado__in=["EN_REVISION", "REABIERTO"]
                 )
 
-            else:  # EMPLEADO
+            elif user.role == "EMPLEADO":
                 empleado = get_user_empleado(user)
                 if not empleado:
                     raise EmpleadoProfileNotFoundError()
                 viajes_qs = Viaje.objects.filter(
                     empleado=empleado,
-                    estado="EN_REVISION"
+                    estado__in=["EN_REVISION", "REABIERTO"]
                 )
+            else:
+                raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
         serializer = PendingTripSerializer(viajes_qs, many=True)
         return Response({
@@ -226,70 +228,44 @@ class PendingTripsDetailView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-class FinalizarRevisionViajeView(APIView):
-    """Permite a MASTER o EMPRESA finalizar la revisión de un viaje"""
+class CambiarEstadoViajeView(APIView):
+    """Permite a MASTER o EMPRESA cambiar el estado de un viaje (revisar o reabrir)"""
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, viaje_id):
+        viaje = get_object_or_404(Viaje, id=viaje_id)
+        target_state = request.data.get("target_state")
+        dias_data = request.data.get("dias")
+
         user = request.user
-        motivo = request.data.get("motivo", "").strip()
-        dias_data = request.data.get("dias", [])
 
-        viaje = get_object_or_404(Viaje, id=viaje_id, estado='EN_REVISION')
-
-        # Validación de permisos
         if user.role == 'EMPRESA':
             empresa = get_user_empresa(user)
             if not empresa or viaje.empresa != empresa:
-                raise UnauthorizedAccessError("No autorizado para revisar este viaje")
-
+                raise UnauthorizedAccessError("No autorizado para gestionar este viaje")
         elif user.role != 'MASTER':
-            raise UnauthorizedAccessError("Solo MASTER o EMPRESA pueden revisar viajes")
+            raise UnauthorizedAccessError("Solo MASTER o EMPRESA pueden gestionar estados de viajes")
 
-        # Procesar revisión
         try:
-            resultado = procesar_revision_viaje(viaje, dias_data, motivo, user)
+            resultado = cambiar_estado_viaje(
+                viaje=viaje,
+                target_state=target_state,
+                usuario=user,
+                dias_data=dias_data
+            )
+            mensaje = "Estado del viaje actualizado correctamente."
+            if resultado.get("nuevo_estado") == "REABIERTO":
+                mensaje = "Viaje reabierto. Los días y gastos deberán revisarse nuevamente."
+            elif resultado.get("nuevo_estado") == "REVISADO":
+                mensaje = "Revisión finalizada."
+
             return Response(
-                {"message": "Revisión finalizada. Conversación creada si fue necesario."},
+                {"message": mensaje, "resultado": resultado},
                 status=status.HTTP_200_OK
             )
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-class ReabrirViajeView(APIView):
-    """Permite reabrir un viaje revisado para recabar más información"""
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def patch(self, request, viaje_id):
-        viaje = get_object_or_404(Viaje, id=viaje_id)
-
-        if viaje.estado != 'REVISADO':
-            return Response(
-                {"error": "Solo se pueden reabrir viajes en estado REVISADO"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        user = request.user
-        if user.role == 'EMPRESA':
-            empresa = get_object_or_404(EmpresaProfile, user=user)
-            if viaje.empresa != empresa:
-                raise UnauthorizedAccessError("No autorizado para reabrir este viaje")
-        elif user.role != 'MASTER':
-            raise UnauthorizedAccessError("Solo MASTER o EMPRESA pueden reabrir viajes")
-
-        viaje.estado = 'EN_REVISION'
-        viaje.save(update_fields=['estado'])
-
-        viaje.dias.update(revisado=False)
-        Gasto.objects.filter(viaje=viaje).exclude(estado='PENDIENTE').update(estado='PENDIENTE')
-
-        return Response(
-            {"message": "Viaje reabierto. Los días y gastos deberán revisarse nuevamente."},
-            status=status.HTTP_200_OK
-        )
 
 
 class EmployeeCityStatsView(APIView):
@@ -330,7 +306,7 @@ class DiaViajeListView(APIView):
             return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
 
         dias = viaje.dias.prefetch_related('gastos')
-        serializer = DiaViajeSerializer(dias, many=True)
+        serializer = DiaViajeSerializer(dias, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -344,7 +320,7 @@ class DiaViajeReviewView(APIView):
         dia = get_object_or_404(DiaViaje, id=dia_id)
         viaje = dia.viaje
 
-        if viaje.estado != 'EN_REVISION':
+        if viaje.estado not in ['EN_REVISION', 'REABIERTO']:
             return Response(
                 {'error': 'El viaje ya no se encuentra en revisión'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -368,12 +344,7 @@ class DiaViajeReviewView(APIView):
         dia.exento = exento
         dia.revisado = True
         dia.save()
-        nuevo_estado = 'RECHAZADO' if exento else 'APROBADO'
+        nuevo_estado = 'APROBADO' if exento else 'RECHAZADO'
         dia.gastos.update(estado=nuevo_estado)
-
-        # Si todos los días están revisados, finalizar el viaje
-        if not viaje.dias.filter(revisado=False).exists():
-            viaje.estado = 'REVISADO'
-            viaje.save()
 
         return Response({'message': 'Día validado correctamente.'}, status=status.HTTP_200_OK)

@@ -3,13 +3,14 @@ Tests de integración para ViewSets de empresas y empleados
 Actualizado para usar endpoints RESTful con DRF Router
 """
 import io
+from decimal import Decimal
 from datetime import date
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje
+from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje, Gasto
 
 # Base URL para todos los endpoints
 API_BASE_URL = '/api/users'
@@ -521,6 +522,22 @@ class PendingReviewsIntegrationTest(TestCase):
             empresa_visitada="Cliente ABC",
             motivo="Reunión comercial"
         )
+        Gasto.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            viaje=self.viaje,
+            concepto="Hotel",
+            monto=Decimal("150.00"),
+            estado="APROBADO"
+        )
+        Gasto.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            viaje=self.viaje,
+            concepto="Taxi",
+            monto=Decimal("30.00"),
+            estado="RECHAZADO"
+        )
 
         self.viaje_extra = Viaje.objects.create(
             empleado=self.empleado,
@@ -534,6 +551,36 @@ class PendingReviewsIntegrationTest(TestCase):
             dias_viajados=3,
             empresa_visitada="Cliente DEF",
             motivo="Seguimiento"
+        )
+        Gasto.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            viaje=self.viaje_extra,
+            concepto="Comidas",
+            monto=Decimal("80.50"),
+            estado="APROBADO"
+        )
+
+        self.viaje_revisado = Viaje.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            destino="Lisboa",
+            ciudad="Lisboa",
+            pais="Portugal",
+            fecha_inicio=date(2023, 11, 5),
+            fecha_fin=date(2023, 11, 7),
+            estado="REVISADO",
+            dias_viajados=3,
+            empresa_visitada="Cliente Lisboa",
+            motivo="Cierre de proyecto"
+        )
+        Gasto.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa_profile,
+            viaje=self.viaje_revisado,
+            concepto="Alojamiento",
+            monto=Decimal("200.00"),
+            estado="APROBADO"
         )
 
         # Empresa adicional con viaje en revisión para validar filtro por empresa
@@ -615,10 +662,16 @@ class PendingReviewsIntegrationTest(TestCase):
         # Buscar al empleado Juan y validar sus dos viajes
         juan = next((item for item in response.data if item['nombre'] == 'Juan'), None)
         self.assertIsNotNone(juan)
-        self.assertEqual(len(juan['viajes_pendientes']), 2)
+        self.assertEqual(len(juan['viajes_pendientes']), 3)
 
         destinos = {v['destino'] for v in juan['viajes_pendientes']}
-        self.assertEqual(destinos, {"Madrid", "Barcelona"})
+        self.assertEqual(destinos, {"Madrid", "Barcelona", "Lisboa"})
+
+        self.assertEqual(juan['descuento_viajes'], '430.50')
+        montos_por_destino = {v['destino']: v['descuento_viajes'] for v in juan['viajes_pendientes']}
+        self.assertEqual(montos_por_destino['Madrid'], '150.00')
+        self.assertEqual(montos_por_destino['Barcelona'], '80.50')
+        self.assertEqual(montos_por_destino['Lisboa'], '200.00')
 
     def test_pending_master_filtra_por_empresa(self):
         """Test GET /empleados/pending/?empresa=ID - filtra por empresa"""
@@ -631,13 +684,15 @@ class PendingReviewsIntegrationTest(TestCase):
 
         # Asegurar que solo se incluyen viajes de la empresa solicitada
         destinos = {viaje['destino'] for viaje in response.data[0]['viajes_pendientes']}
-        self.assertEqual(destinos, {"Madrid", "Barcelona"})
+        self.assertEqual(destinos, {"Madrid", "Barcelona", "Lisboa"})
+        self.assertEqual(response.data[0]['descuento_viajes'], '430.50')
 
         # Al pedir otra empresa, debe devolver los viajes correspondientes
         response_otro = self.client.get(f'{API_BASE_URL}/empleados/pending/?empresa={self.otra_empresa_profile.id}')
         self.assertEqual(response_otro.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response_otro.data), 1)
         self.assertEqual(response_otro.data[0]['viajes_pendientes'][0]['destino'], "Sevilla")
+        self.assertEqual(response_otro.data[0]['descuento_viajes'], '0.00')
 
 
 class AuthorizationIntegrationTest(TestCase):

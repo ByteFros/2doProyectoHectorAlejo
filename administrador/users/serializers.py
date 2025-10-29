@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+import re
 from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
     DiaViaje, Conversacion, Mensaje
 
@@ -14,20 +15,70 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 
 class EmpresaProfileSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    role = serializers.CharField(source='user.role', read_only=True)
+
     class Meta:
         model = EmpresaProfile
-        fields = ['id', 'nombre_empresa', 'nif', 'address', 'city', 'postal_code', 'correo_contacto', 'permisos']
+        fields = [
+            'id',
+            'user_id',
+            'nombre_empresa',
+            'nif',
+            'address',
+            'city',
+            'postal_code',
+            'correo_contacto',
+            'permisos',
+            'role'
+        ]
+
+
+EMAIL_UNICODE_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', re.UNICODE)
 
 
 class EmpleadoProfileSerializer(serializers.ModelSerializer):
     empresa = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
-    email = serializers.StringRelatedField(source="user.email", read_only=True)
+    email = serializers.CharField(source="user.email", required=False)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
-    username = serializers.StringRelatedField(source="user.username", read_only=True)  # 🆕 Añadido
+    username = serializers.CharField(source="user.username", read_only=True)
+    role = serializers.CharField(source="user.role", read_only=True)
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username', 'salario']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username', 'role', 'salario']
+
+    def validate_email(self, value):
+        if value is None:
+            return value
+
+        email_normalized = value.strip()
+        if not EMAIL_UNICODE_REGEX.match(email_normalized):
+            raise serializers.ValidationError("El email no tiene un formato válido")
+
+        queryset = CustomUser.objects.filter(email__iexact=email_normalized)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.user_id)
+
+        if queryset.exists():
+            raise serializers.ValidationError("El email ya está registrado")
+
+        return email_normalized
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        new_email = user_data.get('email')
+
+        if new_email is not None:
+            new_email = new_email.strip()
+            user = instance.user
+            if user.email != new_email or user.username != new_email:
+                user.email = new_email
+                user.username = new_email
+                user.save(update_fields=['email', 'username'])
+
+        instance = super().update(instance, validated_data)
+        return instance
 
 
 class GastoSerializer(serializers.ModelSerializer):
@@ -88,6 +139,21 @@ class GastoSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return gasto
+
+    def update(self, instance, validated_data):
+        viaje = instance.viaje
+        if viaje and viaje.estado == "REABIERTO":
+            # Ignorar identificadores que puedan venir desde el cliente
+            for field in ('viaje_id', 'empresa_id', 'empleado_id'):
+                validated_data.pop(field, None)
+            allowed_fields = {"comprobante"}
+            invalid_fields = [field for field in validated_data.keys() if field not in allowed_fields]
+            if invalid_fields:
+                raise serializers.ValidationError({
+                    field: "No se puede modificar este campo mientras el viaje está reabierto."
+                    for field in invalid_fields
+                })
+        return super().update(instance, validated_data)
 
 
 class DiaViajeGastoSerializer(serializers.ModelSerializer):
@@ -189,7 +255,7 @@ class ViajeSerializer(serializers.ModelSerializer):
             destino=validated_data.get('destino'),
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            estado='EN_REVISION'
+            estado__in=['EN_REVISION', 'REABIERTO']
         ).exists()
         if existe:
             raise serializers.ValidationError(
@@ -277,7 +343,7 @@ class ViajeSerializer(serializers.ModelSerializer):
                 destino=destino,
                 fecha_inicio=fecha_inicio,
                 fecha_fin=fecha_fin,
-                estado='EN_REVISION'
+                estado__in=['EN_REVISION', 'REABIERTO']
         ).exists():
             raise serializers.ValidationError(
                 {'error': 'Ya existe un viaje pendiente a este destino en estas fechas para la empresa.'}
@@ -337,16 +403,41 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
 
 class ConversacionSerializer(serializers.ModelSerializer):
     participantes = serializers.StringRelatedField(many=True)
+    last_message = serializers.SerializerMethodField()
+
     class Meta:
         model = Conversacion
-        fields = ['id', 'gasto', 'participantes', 'fecha_creacion']
+        fields = ['id', 'participantes', 'fecha_creacion', 'last_message']
+
+    def get_last_message(self, obj):
+        last_message = obj.mensajes.order_by('-fecha_creacion').first()
+        if not last_message:
+            return None
+
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        archivo_url = None
+        if last_message.archivo:
+            if request:
+                archivo_url = request.build_absolute_uri(last_message.archivo.url)
+            else:
+                archivo_url = last_message.archivo.url
+
+        return {
+            "id": last_message.id,
+            "autor": last_message.autor.username,
+            "contenido": last_message.contenido,
+            "archivo": archivo_url,
+            "fecha_creacion": last_message.fecha_creacion,
+        }
 
 class MensajeSerializer(serializers.ModelSerializer):
     autor = serializers.StringRelatedField()
+    autor_id = serializers.IntegerField(source='autor.id', read_only=True)
     archivo = serializers.FileField(read_only=True)
+
     class Meta:
         model = Mensaje
-        fields = ['id', 'conversacion', 'autor', 'contenido', 'archivo', 'fecha_creacion']
+        fields = ['id', 'conversacion', 'autor', 'autor_id', 'contenido', 'archivo', 'fecha_creacion']
 
 class CompanyTripsSummarySerializer(serializers.Serializer):
     empresa_id = serializers.IntegerField()

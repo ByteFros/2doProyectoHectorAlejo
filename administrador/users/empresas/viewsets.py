@@ -8,9 +8,10 @@ from rest_framework.response import Response
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from decimal import Decimal
 from django.db.models import Prefetch
 
-from users.models import EmpresaProfile, EmpleadoProfile, Viaje
+from users.models import EmpresaProfile, EmpleadoProfile, Viaje, Gasto
 from users.serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer
 from users.common.services import filter_queryset_by_empresa, get_user_empresa
 from users.common.exceptions import EmpresaProfileNotFoundError
@@ -351,9 +352,9 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     )
     def pending(self, request):
         """
-        Lista empleados que tienen viajes en estado EN_REVISION.
+        Lista empleados que tienen viajes en estado EN_REVISION, REABIERTO o REVISADO.
 
-        Respuesta incluye información del viaje anidada.
+        Respuesta incluye información del viaje anidada y el total de gastos aprobados (`descuento_viajes`).
 
         Filtros opcionales:
         - ?empresa=1 - Filtrar por empresa (solo MASTER)
@@ -368,6 +369,12 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                             "id": 5,
                             "destino": "Madrid",
                             "estado": "EN_REVISION",
+                            ...
+                        },
+                        {
+                            "id": 6,
+                            "destino": "Lisboa",
+                            "estado": "REVISADO",
                             ...
                         }
                     ],
@@ -392,12 +399,23 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-        viajes_queryset = Viaje.objects.filter(estado__in=['EN_REVISION', 'REVISADO'])
+        gastos_aprobados_prefetch = Prefetch(
+            'gasto_set',
+            queryset=Gasto.objects.filter(estado='APROBADO'),
+            to_attr='gastos_aprobados'
+        )
+
+        viajes_queryset = (
+            Viaje.objects
+            .filter(estado__in=['EN_REVISION', 'REABIERTO', 'REVISADO'])
+            .prefetch_related(gastos_aprobados_prefetch)
+            .order_by('fecha_inicio')
+        )
         if empresa_filter:
             viajes_queryset = viajes_queryset.filter(empresa=empresa_filter)
 
         queryset = (
-            EmpleadoProfile.objects.filter(viaje__estado='EN_REVISION')
+            EmpleadoProfile.objects.filter(viaje__estado__in=['EN_REVISION', 'REABIERTO', 'REVISADO'])
             .select_related('user', 'empresa')
             .prefetch_related(
             Prefetch(
@@ -414,13 +432,22 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
 
         # Serializar con viajes anidados
         data = []
-        for empleado in queryset:
+        empleados_vistos = set()
+        for empleado in queryset.order_by('empresa__nombre_empresa', 'nombre', 'apellido'):
+            if empleado.id in empleados_vistos:
+                continue
+            empleados_vistos.add(empleado.id)
+
             empleado_data = EmpleadoProfileSerializer(empleado).data
 
-            # Agregar viajes pendientes
-
             viajes_data = []
-            for viaje in empleado.viajes_pendientes:
+            descuento_total = Decimal('0.00')
+            for viaje in getattr(empleado, 'viajes_pendientes', []):
+                gastos_aprobados = getattr(viaje, 'gastos_aprobados', [])
+                descuento = sum((g.monto for g in gastos_aprobados), Decimal('0.00'))
+                descuento = descuento.quantize(Decimal('0.01'))
+                descuento_total += descuento
+
                 viajes_data.append({
                     "id": viaje.id,
                     "destino": viaje.destino,
@@ -433,10 +460,12 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                     "empresa_visitada": viaje.empresa_visitada,
                     "motivo": viaje.motivo,
                     "fecha_solicitud": viaje.fecha_solicitud,
+                    "descuento_viajes": str(descuento)
                 })
 
             empleado_data['viajes_pendientes'] = viajes_data
             empleado_data['total_viajes_pendientes'] = len(viajes_data)
+            empleado_data['descuento_viajes'] = str(descuento_total.quantize(Decimal('0.01')))
             data.append(empleado_data)
 
         return Response(data, status=status.HTTP_200_OK)

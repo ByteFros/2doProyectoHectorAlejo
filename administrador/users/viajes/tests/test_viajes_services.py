@@ -1,9 +1,13 @@
 """
 Tests actualizados para la lógica de viajes con los nuevos estados.
 """
+import shutil
+import tempfile
 from datetime import date, timedelta
 from decimal import Decimal
-from django.test import TestCase
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework.authtoken.models import Token
@@ -157,7 +161,6 @@ class ProcesarRevisionServiceTest(ViajesServicesBase):
         resultado = procesar_revision_viaje(
             viaje,
             dias_data=[{"id": dia_obj.id, "exento": False}],
-            motivo="Día no exento por exceso de dietas",
             usuario=self.empresa.user,
         )
 
@@ -172,8 +175,9 @@ class ProcesarRevisionServiceTest(ViajesServicesBase):
         self.assertEqual(resultado["dias_procesados"], 3)
 
 
-class ReabrirViajeViewTest(TestCase):
-    """Pruebas para reabrir viajes ya revisados"""
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class CambiarEstadoViajeViewTest(TestCase):
+    """Pruebas para transiciones de estado de viajes (revisión y reapertura)"""
 
     def setUp(self):
         self.client = APIClient()
@@ -213,6 +217,7 @@ class ReabrirViajeViewTest(TestCase):
             apellido="Revisada",
             dni="22334455L"
         )
+        self.empleado_token = Token.objects.create(user=self.empleado_user)
 
         self.viaje = Viaje.objects.create(
             empleado=self.empleado,
@@ -242,19 +247,81 @@ class ReabrirViajeViewTest(TestCase):
             estado="APROBADO"
         )
 
-        self.reabrir_url = f"/api/users/viajes/{self.viaje.id}/reabrir/"
+        self.transition_url = f"/api/users/viajes/{self.viaje.id}/transition/"
 
-    def test_master_puede_reabrir_viaje(self):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+        super().tearDownClass()
+
+    def test_master_puede_finalizar_revision(self):
+        self.viaje.estado = "EN_REVISION"
+        self.viaje.save(update_fields=['estado'])
+
+        self.dia.exento = False
+        self.dia.revisado = True
+        self.dia.save(update_fields=['exento', 'revisado'])
+
+        self.gasto.estado = "RECHAZADO"
+        self.gasto.save(update_fields=['estado'])
+
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
-
-        response = self.client.patch(self.reabrir_url)
-
+        response = self.client.post(
+            self.transition_url,
+            {
+                "target_state": "REVISADO",
+            },
+            format='json'
+        )
         self.assertEqual(response.status_code, 200)
+
         self.viaje.refresh_from_db()
         self.dia.refresh_from_db()
         self.gasto.refresh_from_db()
 
-        self.assertEqual(self.viaje.estado, "EN_REVISION")
+        self.assertEqual(self.viaje.estado, "REVISADO")
+        self.assertTrue(self.dia.revisado)
+        self.assertFalse(self.dia.exento)
+        self.assertEqual(self.gasto.estado, "RECHAZADO")
+        self.assertEqual(response.data["resultado"]["dias_no_exentos"], 1)
+
+    def test_no_puede_finalizar_con_dias_pendientes(self):
+        self.viaje.estado = "EN_REVISION"
+        self.viaje.save(update_fields=['estado'])
+
+        self.dia.revisado = False
+        self.dia.save(update_fields=['revisado'])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        response = self.client.post(
+            self.transition_url,
+            {"target_state": "REVISADO"},
+            format='json'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(self.dia.fecha.isoformat(), response.data.get("error", ""))
+
+    def _reabrir_viaje(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+
+        response = self.client.post(
+            self.transition_url,
+            {"target_state": "REABIERTO"},
+            format='json'
+        )
+
+        self.viaje.refresh_from_db()
+        self.dia.refresh_from_db()
+        self.gasto.refresh_from_db()
+        self.client.credentials()
+        return response
+
+    def test_master_puede_reabrir_viaje(self):
+        response = self._reabrir_viaje()
+
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(self.viaje.estado, "REABIERTO")
         self.assertFalse(self.viaje.dias.filter(revisado=True).exists())
         self.assertEqual(self.gasto.estado, "PENDIENTE")
 
@@ -263,5 +330,55 @@ class ReabrirViajeViewTest(TestCase):
         self.viaje.save(update_fields=['estado'])
 
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
-        response = self.client.patch(self.reabrir_url)
+        response = self.client.post(
+            f"/api/users/viajes/{self.viaje.id}/transition/",
+            {"target_state": "REABIERTO"},
+            format='json'
+        )
         self.assertEqual(response.status_code, 400)
+
+    def test_empleado_no_puede_crear_gasto_en_reabierto(self):
+        self._reabrir_viaje()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        response = self.client.post(
+            "/api/users/gastos/new/",
+            {
+                "viaje_id": str(self.viaje.id),
+                "concepto": "Taxi",
+                "monto": "30.00",
+                "fecha_gasto": str(self.dia.fecha),
+            },
+            format='multipart'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("No puedes registrar nuevos gastos", response.data.get("error", ""))
+
+    def test_empleado_no_puede_modificar_monto_en_reabierto(self):
+        self._reabrir_viaje()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        response = self.client.patch(
+            f"/api/users/gastos/edit/{self.gasto.id}/",
+            {"monto": "150.00"},
+            format='multipart'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data.get("error"),
+            "Solo se permite adjuntar documentación en viajes reabiertos."
+        )
+
+    def test_empleado_puede_adjuntar_comprobante_en_reabierto(self):
+        self._reabrir_viaje()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        archivo = SimpleUploadedFile("ticket.pdf", b"fake pdf content", content_type="application/pdf")
+        response = self.client.patch(
+            f"/api/users/gastos/edit/{self.gasto.id}/",
+            {"comprobante": archivo},
+            format='multipart'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.gasto.refresh_from_db()
+        self.assertTrue(self.gasto.comprobante.name.endswith("ticket.pdf"))

@@ -101,6 +101,7 @@ class Viaje(models.Model):
 
     ESTADO_CHOICES = [
         ("EN_REVISION", "En revision"),
+        ("REABIERTO", "Reabierto"),
         ("REVISADO", "Revisado"),
     ]
 

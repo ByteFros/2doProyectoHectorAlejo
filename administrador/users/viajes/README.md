@@ -239,42 +239,53 @@ Finaliza un viaje (EN_CURSO → EN_REVISION).
 
 ---
 
-#### `POST /viajes/{id}/finalizar_revision/`
-Procesa la revisión final de un viaje (EN_REVISION → FINALIZADO).
+#### `POST /viajes/{id}/transition/`
+Gestiona los cambios de estado permitidos de un viaje.
 
 **Permisos:**
 - ✅ EMPRESA (con permisos=true): Viajes de sus empleados
 - ✅ MASTER: Cualquier viaje
 - ❌ EMPLEADO: No autorizado
 
-**Body:**
+**Body base:**
 ```json
 {
-  "dias_data": [
+  "target_state": "REVISADO",
+  "dias": [
     {"id": 1, "exento": true},
-    {"id": 2, "exento": false},
-    {"id": 3, "exento": true}
-  ],
-  "motivo": "Día 2 requiere justificación adicional"
+    {"id": 2, "exento": false}
+  ]
 }
 ```
 
-**Efecto:**
-- Marca cada día como revisado
-- Actualiza `exento` según lo enviado
-- Actualiza estado de gastos del día:
-  - Día exento=true → gastos APROBADO
-  - Día exento=false → gastos RECHAZADO
-- Cambia viaje a FINALIZADO
-- Crea conversación si hay días no exentos
+**Transiciones soportadas:**
 
-**Respuesta:**
+- `target_state = "REVISADO"`  
+  - Estados válidos de origen: `EN_REVISION`, `REABIERTO`.  
+  - El campo `dias` es opcional:
+    - Si se envía, se procesan esos días exactamente igual que en la revisión “completa”.
+    - Si no se envía, se valida que todos los `DiaViaje` del período estén `revisado=true`; de lo contrario, se devuelve un error indicando las fechas pendientes.  
+  - Efectos:
+    - Mantiene los valores de `exento` y los estados de gastos resultantes (ya fijados al revisar cada día).
+    - Cambia el viaje a `REVISADO`.
+
+- `target_state = "REABIERTO"`  
+  - Estado válido de origen: `REVISADO`  
+  - No requiere `dias`.  
+  - Efectos:
+    - Cambia el viaje a `REABIERTO`.
+    - Marca todos los días como `revisado=false`.
+    - Restaura a `PENDIENTE` los gastos aprobados o rechazados para permitir adjuntar documentación.
+
+**Respuesta genérica:**
 ```json
 {
-  "viaje": {...},
-  "dias_procesados": 3,
-  "dias_no_exentos": 1,
-  "conversacion_creada": true
+  "message": "Estado del viaje actualizado correctamente.",
+  "resultado": {
+    "nuevo_estado": "REVISADO",
+    "dias_procesados": 3,
+    "dias_no_exentos": 1
+  }
 }
 ```
 
@@ -476,26 +487,10 @@ Lista todos los días de un viaje con sus gastos.
 
 ---
 
-#### `PATCH /viajes/{id}/reabrir/`
-Reabre un viaje previamente revisado para solicitar información adicional.
+#### `POST /viajes/{id}/transition/` (reabrir)
+`target_state = "REABIERTO"` reabre un viaje previamente revisado para solicitar información adicional.
 
-**Permisos:**
-- ✅ MASTER: Puede reabrir cualquier viaje
-- ✅ EMPRESA (con permisos=true): Puede reabrir viajes de su empresa
-- ❌ EMPLEADO: No autorizado
-
-**Respuesta:**
-```json
-{
-  "message": "Viaje reabierto. Los días y gastos deberán revisarse nuevamente."
-}
-```
-
-**Efectos secundarios:**
-- El viaje vuelve a estado `EN_REVISION`
-- Todos los días se marcan con `revisado=false`
-- Los gastos asociados se restablecen a estado `PENDIENTE`
-
+**Permisos y efectos:** ver la sección general de `transition`. El mensaje de respuesta indicará que los días y gastos deberán revisarse nuevamente.
 
 ---
 
@@ -517,7 +512,7 @@ Revisa un día de viaje (marca como exento o no exento) usando únicamente el id
 **Efecto:**
 - Actualiza el estado del día (`revisado=true` automáticamente)
 - Cambia el estado de los gastos asociados (`APROBADO` si `exento=true`, `RECHAZADO` en caso contrario)
-- Si todos los días del viaje quedan revisados, el viaje pasa a `REVISADO`
+- El estado del viaje no cambia automáticamente; debe usarse `POST /viajes/{id}/transition/` para cerrarlo manualmente.
 
 ---
 

@@ -4,7 +4,7 @@ Servicios de lógica de negocio para viajes
 from datetime import datetime, date, timedelta
 from typing import Dict, List
 from django.db import transaction
-from users.models import Viaje, EmpleadoProfile, Notificacion, DiaViaje, Conversacion, Mensaje
+from users.models import Viaje, EmpleadoProfile, Notificacion, DiaViaje, Gasto
 
 
 # ============================================================================
@@ -149,9 +149,9 @@ def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> Lis
     Raises:
         ValueError: Si el viaje no está REVISADO o EN_REVISION
     """
-    if viaje.estado not in ["REVISADO", "EN_REVISION"]:
+    if viaje.estado not in ["REVISADO", "EN_REVISION", "REABIERTO"]:
         raise ValueError(
-            f"Este método es solo para viajes REVISADOS o EN_REVISION. "
+            f"Este método es solo para viajes REVISADOS, EN_REVISION o REABIERTO. "
             f"Estado actual: {viaje.estado}"
         )
 
@@ -171,7 +171,6 @@ def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> Lis
 def procesar_revision_viaje(
     viaje: Viaje,
     dias_data: List[Dict],
-    motivo: str,
     usuario
 ) -> Dict:
     """
@@ -180,7 +179,6 @@ def procesar_revision_viaje(
     Args:
         viaje: Viaje a revisar
         dias_data: Lista de diccionarios con {id: int, exento: bool}
-        motivo: Motivo de la revisión
         usuario: Usuario que realiza la revisión
 
     Returns:
@@ -228,29 +226,83 @@ def procesar_revision_viaje(
         if not exento:
             dias_no_exentos.append(dia)
 
-    # Crear conversación si hay días no exentos y motivo
-    conversacion_creada = False
-    if dias_no_exentos and motivo:
-        conversacion = Conversacion.objects.create(viaje=viaje)
-        conversacion.participantes.add(usuario, viaje.empleado.user)
-
-        Mensaje.objects.create(
-            conversacion=conversacion,
-            autor=usuario,
-            contenido=motivo
-        )
-        conversacion_creada = True
-
     # Marcar viaje como revisado
     viaje.estado = "REVISADO"
     viaje.save()
 
     return {
-        "viaje": viaje,
+        "viaje_id": viaje.id,
         "dias_procesados": len(dias_viaje),
-        "dias_no_exentos": len(dias_no_exentos),
-        "conversacion_creada": conversacion_creada
+        "dias_no_exentos": len(dias_no_exentos)
     }
+
+
+@transaction.atomic
+def cambiar_estado_viaje(
+    viaje: Viaje,
+    target_state: str,
+    usuario,
+    dias_data: List[Dict] | None = None
+) -> Dict:
+    """
+    Maneja las transiciones permitidas de estado para un viaje.
+
+    Args:
+        viaje: Viaje a actualizar
+        target_state: Estado deseado ("REVISADO" o "REABIERTO")
+        usuario: Usuario que ejecuta la transición
+        dias_data: Datos de días para procesar revisión (cuando aplica)
+
+    Returns:
+        Información sobre la transición ejecutada.
+
+    Raises:
+        ValueError: Si la transición no es válida o faltan datos requeridos.
+    """
+    estado_actual = viaje.estado
+
+    if target_state not in ["REVISADO", "REABIERTO"]:
+        raise ValueError("Estado de destino inválido.")
+
+    if target_state == "REVISADO":
+        if estado_actual not in ["EN_REVISION", "REABIERTO"]:
+            raise ValueError("Solo puedes marcar como revisado un viaje en revisión o reabierto.")
+        if dias_data is not None:
+            resultado = procesar_revision_viaje(viaje, dias_data, usuario)
+            return {"nuevo_estado": "REVISADO", **resultado}
+
+        dias_pendientes = viaje.dias.filter(revisado=False).order_by("fecha")
+        if dias_pendientes.exists():
+            fechas_pendientes = ", ".join(d.fecha.isoformat() for d in dias_pendientes)
+            raise ValueError(
+                "No puedes finalizar la revisión. "
+                f"Días pendientes de revisar: {fechas_pendientes}"
+            )
+
+        dias_queryset = viaje.dias.order_by("fecha")
+        dias_no_exentos = dias_queryset.filter(exento=False).count()
+
+        viaje.estado = "REVISADO"
+        viaje.save(update_fields=["estado"])
+
+        return {
+            "nuevo_estado": "REVISADO",
+            "viaje_id": viaje.id,
+            "dias_procesados": dias_queryset.count(),
+            "dias_no_exentos": dias_no_exentos
+        }
+
+    # target_state == "REABIERTO"
+    if estado_actual != "REVISADO":
+        raise ValueError("Solo puedes reabrir viajes que están revisados.")
+
+    viaje.estado = "REABIERTO"
+    viaje.save(update_fields=["estado"])
+
+    viaje.dias.update(revisado=False)
+    Gasto.objects.filter(viaje=viaje).exclude(estado='PENDIENTE').update(estado='PENDIENTE')
+
+    return {"nuevo_estado": "REABIERTO", "viaje_id": viaje.id}
 
 
 # ============================================================================

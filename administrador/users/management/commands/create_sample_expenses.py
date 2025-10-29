@@ -150,13 +150,13 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def _add_gastos_to_pending_trips(self, count, gastos_min, gastos_max):
-        """Añade gastos a viajes EN_REVISION existentes"""
-        self.stdout.write(f'\n📋 Añadiendo gastos a {count} viajes EN_REVISION existentes...\n')
+        """Añade gastos a viajes EN_REVISION o REABIERTO existentes"""
+        self.stdout.write(f'\n📋 Añadiendo gastos a {count} viajes pendientes (EN_REVISION o REABIERTO)...\n')
 
         # Obtener viajes en revisión sin gastos (o con pocos gastos)
         viajes = (
             Viaje.objects
-            .filter(estado='EN_REVISION')
+            .filter(estado__in=['EN_REVISION', 'REABIERTO'])
             .prefetch_related('dias', 'dias__gastos')
             .select_related('empleado', 'empresa')
             .order_by('?')[:count]
@@ -164,7 +164,7 @@ class Command(BaseCommand):
 
         if not viajes.exists():
             self.stdout.write(
-                self.style.WARNING('⚠️  No se encontraron viajes EN_REVISION')
+                self.style.WARNING('⚠️  No se encontraron viajes pendientes')
             )
             return 0
 
@@ -385,8 +385,8 @@ class Command(BaseCommand):
         self.stdout.write(f'\n💵 Monto total de gastos: {monto_total:,.2f} EUR')
 
         # Viajes EN_REVISION
-        viajes_en_revision_count = Viaje.objects.filter(estado='EN_REVISION').count()
-        self.stdout.write(f'\n🔍 Viajes EN_REVISION: {viajes_en_revision_count}')
+        viajes_en_revision_count = Viaje.objects.filter(estado__in=['EN_REVISION', 'REABIERTO']).count()
+        self.stdout.write(f'\n🔍 Viajes pendientes (EN_REVISION o REABIERTO): {viajes_en_revision_count}')
         self.stdout.write(f'   ({viajes_nuevos} creados por este comando)')
 
         self.stdout.write('\n' + '='*70)

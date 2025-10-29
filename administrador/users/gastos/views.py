@@ -60,12 +60,12 @@ class CrearGastoView(APIView):
         data["empleado_id"] = empleado.id
         data["empresa_id"] = empleado.empresa.id
 
-        serializer = GastoSerializer(data=data)
+        serializer = GastoSerializer(data=data, context={'request': request})
 
         if serializer.is_valid():
             gasto = serializer.save()
             return Response(
-                GastoSerializer(gasto).data,
+                GastoSerializer(gasto, context={'request': request}).data,
                 status=status.HTTP_201_CREATED
             )
 
@@ -108,7 +108,7 @@ class GastoListView(APIView):
         if gastos is None:
             raise UnauthorizedAccessError("No autorizado")
 
-        serializer = GastoSerializer(gastos, many=True)
+        serializer = GastoSerializer(gastos, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -125,10 +125,22 @@ class GastoUpdateDeleteView(APIView):
         if not puede_modificar_gasto(request.user, gasto):
             raise UnauthorizedAccessError("No puedes modificar este gasto")
 
-        serializer = GastoSerializer(gasto, data=request.data, partial=True)
+        if gasto.viaje and gasto.viaje.estado == "REABIERTO":
+            incoming_fields = set(request.data.keys())
+            allowed_fields = {'comprobante', 'viaje_id', 'empresa_id', 'empleado_id'}
+            if incoming_fields - allowed_fields:
+                return Response(
+                    {"error": "Solo se permite adjuntar documentación en viajes reabiertos."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        serializer = GastoSerializer(gasto, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(
+                GastoSerializer(gasto, context={'request': request}).data,
+                status=status.HTTP_200_OK
+            )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -138,6 +150,12 @@ class GastoUpdateDeleteView(APIView):
         # Verificar permisos
         if not puede_modificar_gasto(request.user, gasto):
             raise UnauthorizedAccessError("No puedes eliminar este gasto")
+
+        if gasto.viaje and gasto.viaje.estado == "REABIERTO":
+            return Response(
+                {"error": "No puedes eliminar gastos mientras el viaje está reabierto."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         eliminar_gasto(gasto)
         return Response(

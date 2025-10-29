@@ -41,7 +41,7 @@ El módulo de viajes está compuesto principalmente por clases `APIView` con rut
 
 6. **Documentación**
    - Actualizar `users/viajes/README.md` para reflejar rutas estándar (`/viajes/`, `/viajes/{id}/`).
-   - Documentar las acciones (`/viajes/{id}/finalizar_revision/`, `/viajes/{id}/reabrir/`, `/viajes/pending/`) y sus query params.
+   - Documentar las acciones (`/viajes/{id}/transition/`, `/viajes/pending/`) y sus query params.
    - Aclarar cómo se obtiene el listado de días (`/viajes/{id}/dias/`) y cómo se revierten gastos/días.
 
 7. **Pruebas**
@@ -70,4 +70,3 @@ El módulo de viajes está compuesto principalmente por clases `APIView` con rut
 5. Validar con datos de prueba y scripts (`create_sample_trips`, `create_sample_expenses`).
 
 Una vez completada esta migración, el módulo de viajes quedará mejor alineado con el patrón REST de DRF, simplificando el mantenimiento y futuras extensiones.
-
