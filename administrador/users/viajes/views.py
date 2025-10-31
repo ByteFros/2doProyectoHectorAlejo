@@ -1,6 +1,7 @@
 """
 Vistas para gestión de viajes
 """
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
@@ -8,8 +9,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje
-from users.serializers import ViajeSerializer, PendingTripSerializer, DiaViajeSerializer
+from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje, Gasto
+from users.serializers import (
+    ViajeSerializer,
+    PendingTripSerializer,
+    DiaViajeSerializer,
+    ViajeWithGastosSerializer,
+    EmpleadoProfileSerializer,
+    EmpresaProfileSerializer,
+)
 from users.common.services import get_user_empleado, get_user_empresa
 from users.common.exceptions import (
     EmpleadoProfileNotFoundError,
@@ -47,6 +55,13 @@ class CrearViajeView(APIView):
         except ValueError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        motivo = request.data.get("motivo")
+        if not motivo:
+            return Response(
+                {"error": "El campo 'motivo' es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Crear viaje
         try:
             viaje = crear_viaje(
@@ -54,7 +69,7 @@ class CrearViajeView(APIView):
                 destino=request.data.get("destino"),
                 fecha_inicio=fecha_inicio,
                 fecha_fin=fecha_fin,
-                motivo=request.data.get("motivo", ""),
+                motivo=motivo,
                 empresa_visitada=request.data.get("empresa_visitada", ""),
                 ciudad=request.data.get("ciudad", ""),
                 pais=request.data.get("pais", ""),
@@ -78,6 +93,21 @@ class ListarViajesRevisadosView(APIView):
 
     def get(self, request):
         user = request.user
+        include = {
+            part.strip().lower()
+            for part in request.query_params.get('include', '').split(',')
+            if part.strip()
+        }
+        serializer_class = ViajeSerializer
+        prefetches = []
+        if 'gastos' in include:
+            serializer_class = ViajeWithGastosSerializer
+            prefetches.append(
+                Prefetch(
+                    'gasto_set',
+                    queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+                )
+            )
 
         if user.role == "MASTER":
             viajes = Viaje.objects.filter(estado="REVISADO")
@@ -103,8 +133,29 @@ class ListarViajesRevisadosView(APIView):
         else:
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
-        serializer = ViajeSerializer(viajes, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if prefetches:
+            viajes = viajes.prefetch_related(*prefetches)
+
+        serializer = serializer_class(viajes, many=True, context={'request': request})
+        data = serializer.data
+
+        if user.role == "EMPLEADO":
+            empleado = get_user_empleado(user)
+            empresa = empleado.empresa if empleado else None
+            employee_data = EmpleadoProfileSerializer(empleado).data if empleado else None
+            company_data = EmpresaProfileSerializer(empresa).data if empresa else None
+
+            for trip in data:
+                trip.pop('empleado', None)
+                trip.pop('empresa', None)
+
+            return Response({
+                "employee": employee_data,
+                "company": company_data,
+                "trips": data
+            }, status=status.HTTP_200_OK)
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class PendingTripsByEmployeeView(APIView):
@@ -149,6 +200,21 @@ class ListarTodosLosViajesView(APIView):
 
     def get(self, request):
         user = request.user
+        include = {
+            part.strip().lower()
+            for part in request.query_params.get('include', '').split(',')
+            if part.strip()
+        }
+        serializer_class = ViajeSerializer
+        prefetches = []
+        if 'gastos' in include:
+            serializer_class = ViajeWithGastosSerializer
+            prefetches.append(
+                Prefetch(
+                    'gasto_set',
+                    queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+                )
+            )
 
         if user.role == "MASTER":
             viajes = Viaje.objects.all()
@@ -170,8 +236,29 @@ class ListarTodosLosViajesView(APIView):
         else:
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
-        serializer = ViajeSerializer(viajes, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        if prefetches:
+            viajes = viajes.prefetch_related(*prefetches)
+
+        serializer = serializer_class(viajes, many=True, context={'request': request})
+        data = serializer.data
+
+        if user.role == "EMPLEADO":
+            empleado = get_user_empleado(user)
+            empresa = empleado.empresa if empleado else None
+            employee_data = EmpleadoProfileSerializer(empleado).data if empleado else None
+            company_data = EmpresaProfileSerializer(empresa).data if empresa else None
+
+            for trip in data:
+                trip.pop('empleado', None)
+                trip.pop('empresa', None)
+
+            return Response({
+                "employee": employee_data,
+                "company": company_data,
+                "trips": data
+            }, status=status.HTTP_200_OK)
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class PendingTripsDetailView(APIView):
@@ -226,6 +313,45 @@ class PendingTripsDetailView(APIView):
             "count": viajes_qs.count(),
             "trips": serializer.data
         }, status=status.HTTP_200_OK)
+
+
+class ViajeDetailView(APIView):
+    """Permite eliminar un viaje según el rol del usuario."""
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, viaje_id):
+        viaje = get_object_or_404(Viaje, id=viaje_id)
+        user = request.user
+
+        if user.role == "EMPLEADO":
+            empleado = get_user_empleado(user)
+            if not empleado or viaje.empleado != empleado:
+                raise UnauthorizedAccessError("Solo puedes eliminar tus propios viajes")
+            if viaje.estado != "EN_REVISION":
+                return Response(
+                    {"error": "Solo puedes eliminar viajes que aún están en revisión"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif user.role == "EMPRESA":
+            empresa = get_user_empresa(user)
+            if not empresa or viaje.empresa != empresa:
+                raise UnauthorizedAccessError("No autorizado para eliminar este viaje")
+            if viaje.estado != "EN_REVISION":
+                return Response(
+                    {"error": "Solo se pueden eliminar viajes que están en revisión"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif user.role == "MASTER":
+            pass
+        else:
+            raise UnauthorizedAccessError("No autorizado para eliminar este viaje")
+
+        viaje.delete()
+        return Response(
+            {"message": "Viaje eliminado correctamente"},
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 
 class CambiarEstadoViajeView(APIView):

@@ -4,7 +4,7 @@ Servicios de lógica de negocio para viajes
 from datetime import datetime, date, timedelta
 from typing import Dict, List
 from django.db import transaction
-from users.models import Viaje, EmpleadoProfile, Notificacion, DiaViaje, Gasto
+from users.models import Viaje, EmpleadoProfile, DiaViaje, Gasto
 
 
 # ============================================================================
@@ -47,7 +47,7 @@ def crear_viaje(
     destino: str,
     fecha_inicio: date,
     fecha_fin: date,
-    motivo: str = "",
+    motivo: str,
     empresa_visitada: str = "",
     ciudad: str = "",
     pais: str = "",
@@ -77,31 +77,20 @@ def crear_viaje(
     dias_viajados = (fecha_fin - fecha_inicio).days + 1
 
     # Crear viaje
-    viaje = Viaje.objects.create(
+    return Viaje.objects.create(
         empleado=empleado,
         empresa=empleado.empresa,
         destino=destino,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
         estado="EN_REVISION",
-        motivo=motivo or "",
+        motivo=motivo,
         empresa_visitada=empresa_visitada or "",
         ciudad=ciudad or "",
         pais=pais or "",
         es_internacional=es_internacional,
         dias_viajados=dias_viajados
     )
-
-    # Crear notificación para la empresa
-    if empleado.empresa:
-        nombre_empleado = f"{empleado.nombre} {empleado.apellido}".strip()
-        Notificacion.objects.create(
-            tipo="VIAJE_SOLICITADO",
-            mensaje=f"{nombre_empleado} ha solicitado un viaje a {viaje.destino}.",
-            usuario_destino=empleado.empresa.user
-        )
-
-    return viaje
 
 
 # ============================================================================

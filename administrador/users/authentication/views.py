@@ -59,14 +59,33 @@ class LogoutView(APIView):
 
 
 class RegisterUserView(APIView):
-    """
-    Registra un nuevo usuario con perfil de empresa o empleado.
-    """
+    """Registra nuevos usuarios controlando el rol del solicitante."""
     authentication_classes = [TokenAuthentication]
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = RegisterUserSerializer(data=request.data)
+        actor = request.user
+
+        if actor.role == "EMPLEADO":
+            return Response({"error": "No autorizado"}, status=status.HTTP_403_FORBIDDEN)
+
+        data = request.data.copy()
+        if hasattr(data, "_mutable"):
+            data._mutable = True
+
+        if actor.role == "EMPRESA":
+            empresa_profile = getattr(actor, "empresa_profile", None)
+            if not empresa_profile:
+                return Response({"error": "El usuario autenticado no tiene perfil de empresa"}, status=status.HTTP_400_BAD_REQUEST)
+            data["role"] = "EMPLEADO"
+            data["empresa_id"] = empresa_profile.id
+        else:  # MASTER
+            role = data.get("role")
+            if not role:
+                return Response({"role": ["Este campo es obligatorio."]}, status=status.HTTP_400_BAD_REQUEST)
+            data["role"] = str(role).upper()
+
+        serializer = RegisterUserSerializer(data=data)
         if serializer.is_valid():
             user = serializer.save()
             return Response(user, status=status.HTTP_201_CREATED)

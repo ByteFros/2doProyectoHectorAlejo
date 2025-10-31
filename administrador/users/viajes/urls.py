@@ -11,13 +11,15 @@ from .views import (
     CambiarEstadoViajeView,
     EmployeeCityStatsView,
     DiaViajeListView,
-    DiaViajeReviewView
+    DiaViajeReviewView,
+    ViajeDetailView
 )
 
 urlpatterns = [
     # Gestión de viajes
     path('viajes/new/', CrearViajeView.as_view(), name='nuevo_viaje'),
     path('viajes/<int:viaje_id>/transition/', CambiarEstadoViajeView.as_view(), name='viaje_transition'),
+    path('viajes/<int:viaje_id>/', ViajeDetailView.as_view(), name='viaje_detail'),
 
     # Listado de viajes
     path('viajes/revisados/', ListarViajesRevisadosView.as_view(), name='viajes-revisados'),

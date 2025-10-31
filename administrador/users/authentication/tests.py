@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
+from rest_framework.authtoken.models import Token
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 
 
@@ -24,6 +25,7 @@ class AuthenticationTestCase(TestCase):
         )
         self.master_user.must_change_password = False
         self.master_user.save()
+        self.master_token = Token.objects.create(user=self.master_user).key
 
         # Crear usuario EMPRESA con perfil
         self.empresa_user = CustomUser.objects.create_user(
@@ -38,6 +40,7 @@ class AuthenticationTestCase(TestCase):
             nif='B12345678',
             correo_contacto='empresa@test.com'
         )
+        self.empresa_token = Token.objects.create(user=self.empresa_user).key
 
         # Crear usuario EMPLEADO con perfil
         self.empleado_user = CustomUser.objects.create_user(
@@ -56,6 +59,14 @@ class AuthenticationTestCase(TestCase):
             apellido='Pérez',
             dni='12345678A'
         )
+        self.empleado_token = Token.objects.create(user=self.empleado_user).key
+
+    def authenticate(self, token=None):
+        """Helper para establecer credenciales del cliente API"""
+        if token:
+            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        else:
+            self.client.credentials()
 
     def test_login_successful_master(self):
         """Test: Login exitoso de usuario MASTER"""
@@ -172,6 +183,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empresa(self):
         """Test: Registro de usuario tipo EMPRESA"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'nueva_empresa',
@@ -198,8 +210,11 @@ class AuthenticationTestCase(TestCase):
         self.assertIsNotNone(empresa)
         self.assertFalse(empresa.permisos)
 
+        self.authenticate()
+
     def test_register_user_empresa_with_autogestion_permissions(self):
         """Test: Registro de empresa con permisos de autogestión"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empresa_autogestion',
@@ -221,9 +236,11 @@ class AuthenticationTestCase(TestCase):
         empresa = EmpresaProfile.objects.filter(nif='B11223344').first()
         self.assertIsNotNone(empresa)
         self.assertTrue(empresa.permisos)
+        self.authenticate()
 
     def test_register_user_empleado_with_salary(self):
         """Test: Registro de empleado permite asignar salario"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empleado_salario',
@@ -242,9 +259,11 @@ class AuthenticationTestCase(TestCase):
         empleado = EmpleadoProfile.objects.filter(dni='22334455K').first()
         self.assertIsNotNone(empleado)
         self.assertEqual(str(empleado.salario), '34500.75')
+        self.authenticate()
 
     def test_register_user_empleado_with_invalid_empresa(self):
         """Test: Registro de empleado con empresa inválida falla"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empleado_invalido',
@@ -260,9 +279,11 @@ class AuthenticationTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('empresa_id', response.data)
+        self.authenticate()
 
     def test_register_user_empleado_with_negative_salary(self):
         """Test: Registro de empleado con salario negativo lanza error"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empleado_negativo',
@@ -279,9 +300,11 @@ class AuthenticationTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('salario', response.data)
+        self.authenticate()
 
     def test_register_user_empleado_without_password_uses_default(self):
         """Test: Registro de empleado sin password usa contraseña por defecto"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empleado_sin_password',
@@ -297,9 +320,11 @@ class AuthenticationTestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = CustomUser.objects.get(username='empleado_sin_password')
         self.assertTrue(user.check_password('empleado'))
+        self.authenticate()
 
     def test_register_user_duplicate_email(self):
         """Test: Registro con email duplicado falla"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'otro_usuario',
@@ -310,9 +335,11 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.authenticate()
 
     def test_register_empresa_duplicate_nif(self):
         """Test: Registro de empresa con NIF duplicado falla"""
+        self.authenticate(self.master_token)
         url = reverse('register')
         data = {
             'username': 'empresa2',
@@ -329,3 +356,56 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.authenticate()
+
+    def test_register_requires_authentication(self):
+        """Test: Registro sin token devuelve 401"""
+        self.authenticate()
+        url = reverse('register')
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_master_can_register_master_user(self):
+        """Test: MASTER puede crear otro MASTER"""
+        self.authenticate(self.master_token)
+        url = reverse('register')
+        data = {
+            'username': 'nuevo_master',
+            'email': 'nuevo.master@test.com',
+            'password': 'password123',
+            'role': 'MASTER'
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = CustomUser.objects.get(username='nuevo_master')
+        self.assertEqual(user.role, 'MASTER')
+        self.authenticate()
+
+    def test_empresa_registers_employee_for_own_company(self):
+        """Test: Empresa solo puede crear empleados ligados a su empresa"""
+        self.authenticate(self.empresa_token)
+        url = reverse('register')
+        data = {
+            'username': 'empleado_empresa',
+            'email': 'empleado.empresa@test.com',
+            'password': 'password123',
+            'role': 'MASTER',  # Será forzado a EMPLEADO
+            'nombre': 'Empleado',
+            'apellido': 'Empresa',
+            'dni': '99887766J'
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        created = CustomUser.objects.get(username='empleado_empresa')
+        self.assertEqual(created.role, 'EMPLEADO')
+        empleado_profile = created.empleado_profile
+        self.assertEqual(empleado_profile.empresa_id, self.empresa_profile.id)
+        self.authenticate()
+
+    def test_empleado_cannot_access_register(self):
+        """Test: Empleado autenticado recibe 403 al registrar"""
+        self.authenticate(self.empleado_token)
+        url = reverse('register')
+        response = self.client.post(url, {})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.authenticate()

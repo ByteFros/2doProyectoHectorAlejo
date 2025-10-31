@@ -419,15 +419,53 @@ class GeneralInfoView(APIView):
 
 
 class EmployeeTripsSummaryView(APIView):
-    """Resumen por empleado: viajes, días y días no exentos (ambos estados (EN_REVISION y REVISADO), solo para EMPRESA)"""
+    """Resumen por empleado:
+
+    - EMPRESA: mantiene el listado de empleados con métricas agregadas.
+    - EMPLEADO: devuelve resumen personal (viajes revisados, en revisión y días exentos/no exentos).
+    """
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
 
+        if user.role == "EMPLEADO":
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
+
+            reviewed_qs = Viaje.objects.filter(empleado=empleado, estado='REVISADO')
+            pending_qs = Viaje.objects.filter(
+                empleado=empleado,
+                estado__in=['EN_REVISION', 'REABIERTO']
+            )
+
+            dias_qs = DiaViaje.objects.filter(
+                viaje__empleado=empleado,
+                viaje__estado='REVISADO'
+            )
+
+            nombre_completo = " ".join(filter(None, [empleado.nombre, empleado.apellido])).strip()
+            data = {
+                "role": "EMPLEADO",
+                "employee": {
+                    "id": empleado.id,
+                    "name": nombre_completo or empleado.user.username,
+                    "company": empleado.empresa.nombre_empresa if empleado.empresa else None,
+                },
+                "summary": {
+                    "reviewedTrips": reviewed_qs.count(),
+                    "pendingTrips": pending_qs.count(),
+                    "exemptDays": dias_qs.filter(exento=True).count(),
+                    "nonExemptDays": dias_qs.filter(exento=False).count(),
+                }
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
         if user.role != "EMPRESA":
-            raise UnauthorizedAccessError("Solo EMPRESA puede ver este reporte")
+            raise UnauthorizedAccessError("Solo EMPRESA o EMPLEADO pueden ver este reporte")
 
         empresa = get_user_empresa(user)
         if not empresa:

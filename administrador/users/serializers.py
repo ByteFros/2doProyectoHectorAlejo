@@ -39,6 +39,7 @@ EMAIL_UNICODE_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', re.UNICODE)
 
 class EmpleadoProfileSerializer(serializers.ModelSerializer):
     empresa = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
+    empresa_id = serializers.IntegerField(source="empresa.id", read_only=True)
     email = serializers.CharField(source="user.email", required=False)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
@@ -46,7 +47,7 @@ class EmpleadoProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EmpleadoProfile
-        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'user_id', 'username', 'role', 'salario']
+        fields = ['id', 'nombre', 'apellido', 'dni', 'email', 'empresa', 'empresa_id', 'user_id', 'username', 'role', 'salario']
 
     def validate_email(self, value):
         if value is None:
@@ -122,6 +123,11 @@ class GastoSerializer(serializers.ModelSerializer):
         if fecha is None:
             fecha = timezone.localdate()
 
+        if fecha < viaje.fecha_inicio or fecha > viaje.fecha_fin:
+            raise serializers.ValidationError({
+                "fecha_gasto": f"La fecha debe estar entre {viaje.fecha_inicio} y {viaje.fecha_fin}"
+            })
+
         # 3) Obtenemos/creamos el DiaViaje
         dia, _ = DiaViaje.objects.get_or_create(viaje=viaje, fecha=fecha)
 
@@ -154,6 +160,33 @@ class GastoSerializer(serializers.ModelSerializer):
                     for field in invalid_fields
                 })
         return super().update(instance, validated_data)
+
+
+class GastoNestedSerializer(serializers.ModelSerializer):
+    """Serializer compacto de gastos para anidar en viajes"""
+    comprobante_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Gasto
+        fields = [
+            "id",
+            "concepto",
+            "monto",
+            "fecha_gasto",
+            "estado",
+            "fecha_solicitud",
+            "comprobante",
+            "comprobante_url",
+        ]
+        read_only_fields = fields
+
+    def get_comprobante_url(self, obj):
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        if obj.comprobante:
+            if request:
+                return request.build_absolute_uri(obj.comprobante.url)
+            return obj.comprobante.url
+        return None
 
 
 class DiaViajeGastoSerializer(serializers.ModelSerializer):
@@ -361,6 +394,16 @@ class ViajeSerializer(serializers.ModelSerializer):
             **validated_data
         )
         return viaje
+
+
+class ViajeWithGastosSerializer(ViajeSerializer):
+    """Extiende el serializer de viajes para incluir los gastos asociados."""
+
+    gastos = GastoNestedSerializer(many=True, read_only=True, source='gasto_set')
+
+    class Meta(ViajeSerializer.Meta):
+        fields = ViajeSerializer.Meta.fields + ['gastos']
+        read_only_fields = ViajeSerializer.Meta.read_only_fields + ['gastos']
 
 
 class NotificacionSerializer(serializers.ModelSerializer):

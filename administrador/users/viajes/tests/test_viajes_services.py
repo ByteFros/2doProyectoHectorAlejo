@@ -10,6 +10,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
+from rest_framework import status
 from rest_framework.authtoken.models import Token
 
 from users.models import (
@@ -382,3 +383,108 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.gasto.refresh_from_db()
         self.assertTrue(self.gasto.comprobante.name.endswith("ticket.pdf"))
+
+
+class EliminarViajeViewTest(TestCase):
+    """Pruebas para eliminación de viajes"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.master_user = User.objects.create_user(
+            username="master_del",
+            email="master_del@test.com",
+            password="pass",
+            role="MASTER"
+        )
+        self.master_token = Token.objects.create(user=self.master_user).key
+
+        self.empresa_user = User.objects.create_user(
+            username="empresa_del",
+            email="empresa_del@test.com",
+            password="pass",
+            role="EMPRESA"
+        )
+        self.empresa = EmpresaProfile.objects.create(
+            user=self.empresa_user,
+            nombre_empresa="Empresa Delete",
+            nif="B99999999",
+            correo_contacto="empresa_del@test.com",
+        )
+        self.empresa_token = Token.objects.create(user=self.empresa_user).key
+
+        self.empleado_user = User.objects.create_user(
+            username="empleado_del",
+            email="empleado_del@test.com",
+            password="pass",
+            role="EMPLEADO"
+        )
+        self.empleado = EmpleadoProfile.objects.create(
+            user=self.empleado_user,
+            empresa=self.empresa,
+            nombre="Luis",
+            apellido="García",
+            dni="55555555A",
+        )
+        self.empleado_token = Token.objects.create(user=self.empleado_user).key
+
+        self.viaje = Viaje.objects.create(
+            empleado=self.empleado,
+            empresa=self.empresa,
+            destino="Madrid, España",
+            fecha_inicio=date(2025, 2, 1),
+            fecha_fin=date(2025, 2, 3),
+            dias_viajados=3,
+            estado="EN_REVISION",
+        )
+
+    def _delete(self, token, viaje_id=None):
+        viaje_id = viaje_id or self.viaje.id
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+        return self.client.delete(f"/api/users/viajes/{viaje_id}/")
+
+    def test_empleado_elimina_viaje_en_revision(self):
+        response = self._delete(self.empleado_token)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Viaje.objects.filter(id=self.viaje.id).exists())
+
+    def test_empleado_no_puede_eliminar_viaje_revisado(self):
+        self.viaje.estado = "REVISADO"
+        self.viaje.save(update_fields=['estado'])
+
+        response = self._delete(self.empleado_token)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Viaje.objects.filter(id=self.viaje.id).exists())
+
+    def test_empleado_no_puede_eliminar_viaje_de_otro(self):
+        otro_user = User.objects.create_user(
+            username="empleado_otro",
+            email="empleado_otro@test.com",
+            password="pass",
+            role="EMPLEADO"
+        )
+        otro_empleado = EmpleadoProfile.objects.create(
+            user=otro_user,
+            empresa=self.empresa,
+            nombre="Ana",
+            apellido="López",
+            dni="55555555B",
+        )
+        otro_token = Token.objects.create(user=otro_user).key
+
+        response = self._delete(otro_token)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Viaje.objects.filter(id=self.viaje.id).exists())
+
+    def test_master_puede_eliminar_viaje_revisado(self):
+        self.viaje.estado = "REVISADO"
+        self.viaje.save(update_fields=['estado'])
+
+        response = self._delete(self.master_token)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Viaje.objects.filter(id=self.viaje.id).exists())
+
+    def test_empresa_elimina_viaje_en_revision(self):
+        response = self._delete(self.empresa_token)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Viaje.objects.filter(id=self.viaje.id).exists())

@@ -75,7 +75,8 @@ class PasswordManagementTestCase(TestCase):
         url = reverse('password_reset_confirm')
         data = {
             'token': str(reset_token.token),
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.post(url, data)
 
@@ -95,7 +96,8 @@ class PasswordManagementTestCase(TestCase):
         url = reverse('password_reset_confirm')
         data = {
             'token': '00000000-0000-0000-0000-000000000000',
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.post(url, data)
 
@@ -112,7 +114,8 @@ class PasswordManagementTestCase(TestCase):
         url = reverse('password_reset_confirm')
         data = {
             'token': str(reset_token.token),
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.post(url, data)
 
@@ -127,7 +130,8 @@ class PasswordManagementTestCase(TestCase):
         url = reverse('password_reset_confirm')
         data = {
             'token': str(reset_token.token),
-            'new_password': 'short'  # Menos de 8 caracteres
+            'new_password': 'short',  # Menos de 8 caracteres
+            'confirm_password': 'short'
         }
         response = self.client.post(url, data)
 
