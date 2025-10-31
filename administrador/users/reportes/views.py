@@ -53,6 +53,14 @@ class CompanyTripsSummaryView(APIView):
 
         # TODO: Implementar Prefetch aquí cuando include_empleados=True
 
+        # Base de empresas permitidas según el rol
+        qs = EmpresaProfile.objects.all()
+        if request.user.role == 'EMPRESA':
+            empresa = get_user_empresa(request.user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
+            qs = qs.filter(pk=empresa.pk)
+
         # Base de viajes (ambos estados (EN_REVISION y REVISADO)) por empresa
         viajes = Viaje.objects.filter(
             empleado__empresa=OuterRef('pk')
@@ -105,7 +113,7 @@ class CompanyTripsSummaryView(APIView):
         )
 
         # Annotate la QS principal
-        qs = EmpresaProfile.objects.annotate(
+        qs = qs.annotate(
             trips=Coalesce(
                 Subquery(trips_sq, output_field=IntegerField()),
                 Value(0)
