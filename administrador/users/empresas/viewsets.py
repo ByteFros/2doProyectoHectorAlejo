@@ -10,10 +10,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from decimal import Decimal
 from django.db.models import Prefetch
+from django.utils import timezone
 
 from users.models import EmpresaProfile, EmpleadoProfile, Viaje, Gasto
 from users.serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer
-from users.common.services import filter_queryset_by_empresa, get_user_empresa
+from users.common.services import (
+    filter_queryset_by_empresa,
+    get_user_empresa,
+    get_periodicity_delta,
+    sync_company_review_notification,
+    ensure_company_is_up_to_date,
+)
 from users.common.exceptions import EmpresaProfileNotFoundError
 
 from .serializers import (
@@ -68,7 +75,7 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         """Retorna el serializer apropiado según la acción y query params"""
         if self.action == 'create':
             return EmpresaCreateSerializer
-        elif self.action == 'partial_update' and 'permisos' in self.request.data:
+        elif self.action == 'partial_update' and 'permisos' in self.request.data and len(self.request.data) == 1:
             return EmpresaUpdatePermissionsSerializer
 
         # Detectar parámetro 'include' para respuestas anidadas
@@ -140,8 +147,38 @@ class EmpresaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
 
-        # Actualización parcial normal
-        return super().partial_update(request, *args, **kwargs)
+        data = request.data.copy()
+        manual_value = data.get('manual_release_at')
+        if manual_value == '' or manual_value is None:
+            data['manual_release_at'] = None
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        empresa = serializer.save()
+
+        updated_fields = []
+        notification_limit = None
+
+        if 'periodicity' in serializer.validated_data:
+            base_dt = empresa.last_release_at or timezone.now()
+            empresa.next_release_at = base_dt + get_periodicity_delta(empresa)
+            updated_fields.append('next_release_at')
+
+        if 'manual_release_at' in serializer.validated_data:
+            # El serializer ya persistió manual_release_at, pero registramos cambio
+            notification_limit = empresa.manual_release_at
+
+        if updated_fields:
+            empresa.save(update_fields=updated_fields)
+
+        if {'periodicity', 'manual_release_at'} & set(serializer.validated_data.keys()):
+            limit = notification_limit or empresa.manual_release_at or empresa.next_release_at
+            sync_company_review_notification(empresa, limit_datetime=limit)
+
+        empresa.refresh_from_db()
+        response_serializer = self.get_serializer(empresa)
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     def destroy(self, request, *args, **kwargs):
         """Elimina una empresa y todos sus empleados"""
@@ -150,6 +187,34 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         return Response(
             {"message": "Empresa eliminada correctamente"},
             status=status.HTTP_204_NO_CONTENT
+        )
+
+    @action(
+        detail=True,
+        methods=['post'],
+        url_path='publish',
+        permission_classes=[IsAuthenticated, IsMaster]
+    )
+    def publish(self, request, pk=None):
+        """Permite a MASTER publicar los datos revisados de una empresa inmediatamente."""
+        empresa = self.get_object()
+        empresa.force_release = True
+        empresa.save(update_fields=['force_release'])
+
+        updated = ensure_company_is_up_to_date(empresa)
+        empresa.refresh_from_db()
+
+        response_serializer = self.get_serializer(empresa)
+        message = "Datos publicados correctamente"
+        if not updated:
+            message = "No había cambios pendientes para publicar"
+
+        return Response(
+            {
+                "message": message,
+                "empresa": response_serializer.data
+            },
+            status=status.HTTP_200_OK
         )
 
 

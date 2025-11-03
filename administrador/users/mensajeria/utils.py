@@ -19,8 +19,8 @@ def get_target_user_or_400(user: CustomUser, target_user_id: int) -> CustomUser:
         raise UnauthorizedAccessError("No puedes iniciar una conversación contigo mismo")
 
     if user.role == "MASTER":
-        if target_user.role not in ["EMPRESA", "EMPLEADO"]:
-            raise UnauthorizedAccessError("Sólo puedes contactar empresas o empleados")
+        if target_user.role not in ["EMPRESA", "EMPLEADO", "MASTER"]:
+            raise UnauthorizedAccessError("Sólo puedes contactar perfiles válidos")
         return target_user
 
     if user.role == "EMPRESA":
@@ -43,6 +43,9 @@ def get_target_user_or_400(user: CustomUser, target_user_id: int) -> CustomUser:
         empleado_profile = getattr(user, "empleado_profile", None)
         if not empleado_profile:
             raise UnauthorizedAccessError("No se encontró el perfil de empleado")
+
+        if target_user.role == "MASTER":
+            return target_user
 
         if target_user.role == "EMPRESA":
             empresa_user = empleado_profile.empresa.user

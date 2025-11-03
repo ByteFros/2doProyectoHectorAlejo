@@ -32,6 +32,13 @@ class CustomUser(AbstractUser):
 
 class EmpresaProfile(models.Model):
     """Perfil para usuarios con rol EMPRESA"""
+    PERIODICITY_TRIMESTRAL = "TRIMESTRAL"
+    PERIODICITY_SEMESTRAL = "SEMESTRAL"
+    PERIODICITY_CHOICES = [
+        (PERIODICITY_TRIMESTRAL, "Trimestral"),
+        (PERIODICITY_SEMESTRAL, "Semestral"),
+    ]
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="empresa_profile")
     nombre_empresa = models.CharField(max_length=255)
     nif = models.CharField(max_length=50, unique=True)  # Identificación Fiscal
@@ -40,6 +47,16 @@ class EmpresaProfile(models.Model):
     postal_code = models.CharField(max_length=10, null=True, blank=True)  # ✅ Código Postal
     correo_contacto = models.EmailField()
     permisos = models.BooleanField(default=False)  # ✅ Permisos
+    periodicity = models.CharField(
+        max_length=20,
+        choices=PERIODICITY_CHOICES,
+        default=PERIODICITY_TRIMESTRAL,
+    )
+    last_release_at = models.DateTimeField(null=True, blank=True)
+    next_release_at = models.DateTimeField(null=True, blank=True)
+    manual_release_at = models.DateTimeField(null=True, blank=True)
+    force_release = models.BooleanField(default=False)
+    has_pending_review_changes = models.BooleanField(default=False)
 
     def delete(self, *args, **kwargs):
         """Si se elimina una empresa tambien se debe eliminar a sus empleados"""
@@ -133,6 +150,47 @@ class DiaViaje(models.Model):
     revisado = models.BooleanField(default=False)
 
 
+class ViajeReviewSnapshot(models.Model):
+    """Snapshot publicado de viajes revisados"""
+
+    viaje = models.OneToOneField("Viaje", on_delete=models.CASCADE, related_name="review_snapshot")
+    empresa = models.ForeignKey("EmpresaProfile", on_delete=models.CASCADE, related_name="viaje_snapshots")
+    empleado = models.ForeignKey("EmpleadoProfile", on_delete=models.CASCADE, related_name="viaje_snapshots")
+    estado = models.CharField(max_length=15, choices=Viaje.ESTADO_CHOICES)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    ciudad = models.CharField(max_length=255, null=True, blank=True)
+    pais = models.CharField(max_length=255, null=True, blank=True)
+    es_internacional = models.BooleanField(default=False)
+    destino = models.CharField(max_length=255)
+    dias_viajados = models.PositiveIntegerField(default=1)
+    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)
+    motivo = models.TextField(max_length=500, null=True, blank=True)
+    published_at = models.DateTimeField(auto_now_add=True)
+    source_updated_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Snapshot Viaje {self.viaje_id} ({self.estado})"
+
+
+class DiaViajeReviewSnapshot(models.Model):
+    """Snapshot publicado de días asociados a viajes revisados"""
+
+    dia = models.OneToOneField("DiaViaje", on_delete=models.CASCADE, related_name="review_snapshot")
+    viaje_snapshot = models.ForeignKey(
+        "ViajeReviewSnapshot",
+        on_delete=models.CASCADE,
+        related_name="dias_snapshot"
+    )
+    fecha = models.DateField()
+    exento = models.BooleanField(default=True)
+    revisado = models.BooleanField(default=False)
+    published_at = models.DateTimeField(auto_now_add=True)
+    source_updated_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Snapshot Día {self.dia_id} (exento={self.exento})"
+
 
 class Gasto(models.Model):
     """Modelo de gastos asociados a viajes"""
@@ -159,11 +217,41 @@ class Gasto(models.Model):
         return f"{self.concepto} - {self.estado}"
 
 
+class GastoReviewSnapshot(models.Model):
+    """Snapshot publicado de gastos revisados"""
+
+    gasto = models.OneToOneField("Gasto", on_delete=models.CASCADE, related_name="review_snapshot")
+    viaje_snapshot = models.ForeignKey(
+        "ViajeReviewSnapshot",
+        on_delete=models.CASCADE,
+        related_name="gastos_snapshot",
+        null=True,
+        blank=True
+    )
+    empresa = models.ForeignKey("EmpresaProfile", on_delete=models.CASCADE, related_name="gasto_snapshots")
+    empleado = models.ForeignKey("EmpleadoProfile", on_delete=models.CASCADE, related_name="gasto_snapshots")
+    concepto = models.TextField()
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    estado = models.CharField(max_length=10, choices=Gasto.ESTADO_CHOICES)
+    fecha_gasto = models.DateField(null=True, blank=True, help_text="Fecha del gasto")
+    published_at = models.DateTimeField(auto_now_add=True)
+    source_updated_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Snapshot Gasto {self.gasto_id} ({self.estado})"
+
+
 class Notificacion(models.Model):
+    TIPO_VIAJE_SOLICITADO = "VIAJE_SOLICITADO"
+    TIPO_VIAJE_APROBADO = "VIAJE_APROBADO"
+    TIPO_GASTO_REGISTRADO = "GASTO_REGISTRADO"
+    TIPO_REVISION_FECHA_LIMITE = "REVISION_FECHA_LIMITE"
+
     TIPOS_NOTIFICACION = [
-        ("VIAJE_SOLICITADO", "Viaje solicitado"),
-        ("VIAJE_APROBADO", "Viaje aprobado"),
-        ("GASTO_REGISTRADO", "Gasto registrado"),
+        (TIPO_VIAJE_SOLICITADO, "Viaje solicitado"),
+        (TIPO_VIAJE_APROBADO, "Viaje aprobado"),
+        (TIPO_GASTO_REGISTRADO, "Gasto registrado"),
+        (TIPO_REVISION_FECHA_LIMITE, "Fecha límite de revisión"),
     ]
 
     tipo = models.CharField(max_length=50, choices=TIPOS_NOTIFICACION)

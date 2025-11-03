@@ -117,10 +117,6 @@ def change_user_password(user, old_password, new_password):
     Returns:
         tuple: (bool éxito, dict datos de respuesta o error)
     """
-    # Validar rol MASTER
-    if user.role == "MASTER":
-        return False, {"error": "Los usuarios master no deberían usar este formulario."}
-
     # Validar contraseña actual
     if not user.check_password(old_password):
         return False, {"error": "La contraseña actual es incorrecta."}

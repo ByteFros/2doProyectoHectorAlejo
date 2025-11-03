@@ -2,9 +2,24 @@
 Servicios comunes reutilizables para toda la aplicación
 Incluye lógica de filtrado jerárquico y obtención de perfiles
 """
-from typing import Optional, Tuple
-from django.db.models import QuerySet, Model
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
+from datetime import timedelta
+from typing import Optional, Tuple, Iterable, NamedTuple
+from django.db import transaction
+from django.db.models import QuerySet
+from django.utils import timezone
+from django.utils.formats import date_format
+from users.models import (
+    CustomUser,
+    EmpresaProfile,
+    EmpleadoProfile,
+    Viaje,
+    DiaViaje,
+    Gasto,
+    ViajeReviewSnapshot,
+    DiaViajeReviewSnapshot,
+    GastoReviewSnapshot,
+    Notificacion,
+)
 
 
 # ============================================================================
@@ -315,6 +330,272 @@ def validate_user_has_empleado_profile(user: CustomUser) -> Tuple[bool, Optional
         return False, "No tienes un perfil de empleado asociado"
 
     return True, None
+
+
+# ============================================================================
+# PUBLICACIÓN DIFERIDA DE VIAJES/GASTOS
+# ============================================================================
+
+PERIODICITY_DELTA_MAP = {
+    EmpresaProfile.PERIODICITY_TRIMESTRAL: timedelta(days=90),
+    EmpresaProfile.PERIODICITY_SEMESTRAL: timedelta(days=180),
+}
+
+
+def get_periodicity_delta(empresa: EmpresaProfile) -> timedelta:
+    """
+    Retorna el delta de tiempo asociado a la periodicidad de la empresa.
+    """
+    return PERIODICITY_DELTA_MAP.get(
+        empresa.periodicity,
+        PERIODICITY_DELTA_MAP[EmpresaProfile.PERIODICITY_TRIMESTRAL],
+    )
+
+
+def mark_company_review_pending(empresa: EmpresaProfile, *, save: bool = True) -> None:
+    """
+    Marca a la empresa con cambios pendientes de publicación.
+    """
+    if not empresa.has_pending_review_changes:
+        empresa.has_pending_review_changes = True
+        if save:
+            empresa.save(update_fields=["has_pending_review_changes"])
+
+
+def _sync_dias_snapshot(
+    snapshot: ViajeReviewSnapshot,
+    dias: Iterable[DiaViaje],
+    now
+) -> None:
+    current_ids = set()
+    for dia in dias:
+        DiaViajeReviewSnapshot.objects.update_or_create(
+            dia=dia,
+            defaults={
+                "viaje_snapshot": snapshot,
+                "fecha": dia.fecha,
+                "exento": dia.exento,
+                "revisado": dia.revisado,
+                "source_updated_at": now,
+            },
+        )
+        current_ids.add(dia.id)
+
+    snapshot.dias_snapshot.exclude(dia_id__in=current_ids).delete()
+
+
+def _sync_gastos_snapshot(
+    snapshot: ViajeReviewSnapshot,
+    gastos: Iterable[Gasto],
+    now
+) -> None:
+    current_ids = set()
+    for gasto in gastos:
+        GastoReviewSnapshot.objects.update_or_create(
+            gasto=gasto,
+            defaults={
+                "viaje_snapshot": snapshot,
+                "empresa": snapshot.empresa,
+                "empleado": snapshot.empleado,
+                "concepto": gasto.concepto,
+                "monto": gasto.monto,
+                "estado": gasto.estado,
+                "fecha_gasto": gasto.fecha_gasto,
+                "source_updated_at": now,
+            },
+        )
+        current_ids.add(gasto.id)
+
+    snapshot.gastos_snapshot.exclude(gasto_id__in=current_ids).delete()
+
+
+@transaction.atomic
+def sync_company_review_snapshots(
+    empresa: EmpresaProfile,
+    *,
+    current_time=None
+) -> None:
+    """
+    Copia los datos revisados a la capa de snapshots publicada.
+    """
+    now = current_time or timezone.now()
+
+    viajes = (
+        Viaje.objects
+        .filter(empresa=empresa, estado="REVISADO")
+        .select_related("empleado")
+        .prefetch_related("dias", "gasto_set")
+    )
+
+    for viaje in viajes:
+        snapshot, _ = ViajeReviewSnapshot.objects.update_or_create(
+            viaje=viaje,
+            defaults={
+                "empresa": empresa,
+                "empleado": viaje.empleado,
+                "estado": viaje.estado,
+                "fecha_inicio": viaje.fecha_inicio,
+                "fecha_fin": viaje.fecha_fin,
+                "ciudad": viaje.ciudad,
+                "pais": viaje.pais,
+                "es_internacional": viaje.es_internacional,
+                "destino": viaje.destino,
+                "dias_viajados": viaje.dias_viajados,
+                "empresa_visitada": viaje.empresa_visitada,
+                "motivo": viaje.motivo,
+                "source_updated_at": now,
+            },
+        )
+
+        _sync_dias_snapshot(snapshot, viaje.dias.all(), now)
+        gastos_revisados = viaje.gasto_set.exclude(estado="PENDIENTE")
+        _sync_gastos_snapshot(snapshot, gastos_revisados, now)
+
+    empresa.has_pending_review_changes = False
+    empresa.save(update_fields=["has_pending_review_changes"])
+
+
+def sync_company_review_notification(
+    empresa: EmpresaProfile,
+    *,
+    limit_datetime=None
+) -> Optional[Notificacion]:
+    """
+    Crea o actualiza la notificación de fecha límite de revisión.
+    """
+    destinatario = empresa.user
+    Notificacion.objects.filter(
+        usuario_destino=destinatario,
+        tipo=Notificacion.TIPO_REVISION_FECHA_LIMITE,
+    ).delete()
+
+    limit_dt = limit_datetime or empresa.next_release_at
+    if not limit_dt:
+        return None
+
+    message = (
+        f"La próxima fecha límite de revisión para {empresa.nombre_empresa} "
+        f"es {date_format(limit_dt, 'DATE_FORMAT')}."
+    )
+
+    return Notificacion.objects.create(
+        tipo=Notificacion.TIPO_REVISION_FECHA_LIMITE,
+        mensaje=message,
+        usuario_destino=destinatario,
+    )
+
+
+@transaction.atomic
+def ensure_company_is_up_to_date(
+    empresa: EmpresaProfile,
+    *,
+    current_time=None
+) -> bool:
+    """
+    Garantiza que la empresa tenga snapshots publicados cuando corresponda.
+
+    Returns:
+        True si se realizaron sincronizaciones; False en caso contrario.
+    """
+    now = current_time or timezone.now()
+    should_sync = False
+
+    if empresa.force_release:
+        should_sync = True
+    elif empresa.manual_release_at and empresa.manual_release_at <= now:
+        should_sync = True
+    elif empresa.next_release_at and empresa.next_release_at <= now:
+        should_sync = True
+    elif not empresa.next_release_at:
+        should_sync = True
+
+    if not should_sync:
+        return False
+
+    sync_company_review_snapshots(empresa, current_time=now)
+
+    empresa.last_release_at = now
+    empresa.next_release_at = now + get_periodicity_delta(empresa)
+    empresa.manual_release_at = None
+    empresa.force_release = False
+    empresa.save(
+        update_fields=[
+            "last_release_at",
+            "next_release_at",
+            "manual_release_at",
+            "force_release",
+        ]
+    )
+
+    sync_company_review_notification(empresa, limit_datetime=empresa.next_release_at)
+    return True
+
+
+class VisibleViajesResult(NamedTuple):
+    queryset: QuerySet
+    uses_snapshot: bool
+
+
+def get_visible_viajes_queryset(user: CustomUser) -> VisibleViajesResult:
+    """
+    Retorna el queryset de viajes visible según el rol del usuario.
+    """
+    if user.role == "MASTER":
+        qs = Viaje.objects.all()
+        return VisibleViajesResult(qs, uses_snapshot=False)
+
+    if user.role == "EMPRESA":
+        empresa = get_user_empresa(user)
+        if not empresa:
+            return VisibleViajesResult(ViajeReviewSnapshot.objects.none(), uses_snapshot=True)
+        ensure_company_is_up_to_date(empresa)
+        qs = (
+            ViajeReviewSnapshot.objects
+            .filter(empresa=empresa)
+            .select_related("empleado", "empleado__user", "empresa", "empresa__user", "viaje")
+            .prefetch_related("dias_snapshot", "gastos_snapshot", "gastos_snapshot__gasto")
+        )
+        return VisibleViajesResult(qs, uses_snapshot=True)
+
+    if user.role == "EMPLEADO":
+        empleado = get_user_empleado(user)
+        if not empleado:
+            return VisibleViajesResult(ViajeReviewSnapshot.objects.none(), uses_snapshot=True)
+        empresa = empleado.empresa
+        ensure_company_is_up_to_date(empresa)
+        qs = (
+            ViajeReviewSnapshot.objects
+            .filter(empresa=empresa, empleado=empleado)
+            .select_related("empleado", "empleado__user", "empresa", "empresa__user", "viaje")
+            .prefetch_related("dias_snapshot", "gastos_snapshot", "gastos_snapshot__gasto")
+        )
+        return VisibleViajesResult(qs, uses_snapshot=True)
+
+    raise ValueError(f"Rol de usuario no reconocido: {user.role}")
+
+
+def get_visible_dias_queryset(viajes_result: VisibleViajesResult) -> QuerySet:
+    """
+    Retorna el queryset de días asociado al resultado de viajes visible.
+    """
+    if viajes_result.uses_snapshot:
+        return DiaViajeReviewSnapshot.objects.filter(
+            viaje_snapshot__in=viajes_result.queryset
+        )
+
+    return DiaViaje.objects.filter(viaje__in=viajes_result.queryset)
+
+
+def get_visible_gastos_queryset(viajes_result: VisibleViajesResult) -> QuerySet:
+    """
+    Retorna el queryset de gastos asociado al resultado de viajes visible.
+    """
+    if viajes_result.uses_snapshot:
+        return GastoReviewSnapshot.objects.filter(
+            viaje_snapshot__in=viajes_result.queryset
+        )
+
+    return Gasto.objects.filter(viaje__in=viajes_result.queryset)
 
 
 # ============================================================================

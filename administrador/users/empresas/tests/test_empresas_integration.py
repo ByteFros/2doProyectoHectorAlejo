@@ -4,13 +4,14 @@ Actualizado para usar endpoints RESTful con DRF Router
 """
 import io
 from decimal import Decimal
-from datetime import date
+from datetime import date, timedelta
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
+from django.utils import timezone
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje, Gasto
+from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje, Gasto, DiaViaje, Notificacion
 
 # Base URL para todos los endpoints
 API_BASE_URL = '/api/users'
@@ -160,6 +161,121 @@ class EmpresaViewSetIntegrationTest(TestCase):
         # Verificar cambio
         empresa.refresh_from_db()
         self.assertTrue(empresa.permisos)
+
+    def test_master_updates_periodicity_and_manual_release(self):
+        """PATCH /empresas/{id}/ actualiza periodicidad y crea notificación"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        empresa_user = CustomUser.objects.create_user(
+            username="empresa_periodicidad",
+            email="empresa_periodicidad@test.com",
+            password="pass",
+            role="EMPRESA"
+        )
+        empresa = EmpresaProfile.objects.create(
+            user=empresa_user,
+            nombre_empresa="Empresa Periodicidad",
+            nif="B11111111",
+            correo_contacto="empresa_periodicidad@test.com"
+        )
+
+        manual_release = (timezone.now() + timedelta(days=45)).isoformat()
+        payload = {
+            "periodicity": EmpresaProfile.PERIODICITY_SEMESTRAL,
+            "manual_release_at": manual_release
+        }
+
+        response = self.client.patch(
+            f'{API_BASE_URL}/empresas/{empresa.id}/',
+            payload,
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        empresa.refresh_from_db()
+        self.assertEqual(empresa.periodicity, EmpresaProfile.PERIODICITY_SEMESTRAL)
+        self.assertIsNotNone(empresa.next_release_at)
+        self.assertGreater(empresa.next_release_at, timezone.now())
+        self.assertIsNotNone(empresa.manual_release_at)
+
+        notification_exists = Notificacion.objects.filter(
+            usuario_destino=empresa.user,
+            tipo=Notificacion.TIPO_REVISION_FECHA_LIMITE
+        ).exists()
+        self.assertTrue(notification_exists)
+
+    def test_master_publish_forces_release(self):
+        """POST /empresas/{id}/publish/ fuerza la publicación de datos"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        empresa_user = CustomUser.objects.create_user(
+            username="empresa_publish",
+            email="empresa_publish@test.com",
+            password="pass",
+            role="EMPRESA"
+        )
+        empresa = EmpresaProfile.objects.create(
+            user=empresa_user,
+            nombre_empresa="Empresa Publish",
+            nif="B22222222",
+            correo_contacto="empresa_publish@test.com"
+        )
+
+        empleado_user = CustomUser.objects.create_user(
+            username="empleado_publish",
+            email="empleado_publish@test.com",
+            password="pass",
+            role="EMPLEADO"
+        )
+        empleado = EmpleadoProfile.objects.create(
+            user=empleado_user,
+            empresa=empresa,
+            nombre="Empleado",
+            apellido="Publish",
+            dni="12345678Z"
+        )
+
+        viaje = Viaje.objects.create(
+            empleado=empleado,
+            empresa=empresa,
+            destino="Barcelona",
+            fecha_inicio=timezone.now().date(),
+            fecha_fin=timezone.now().date(),
+            estado="REVISADO",
+            motivo="Publicación",
+            dias_viajados=1,
+        )
+
+        DiaViaje.objects.create(
+            viaje=viaje,
+            fecha=viaje.fecha_inicio,
+            exento=True,
+            revisado=True,
+        )
+
+        empresa.has_pending_review_changes = True
+        empresa.next_release_at = timezone.now() + timedelta(days=60)
+        empresa.save(update_fields=['has_pending_review_changes', 'next_release_at'])
+
+        response = self.client.post(
+            f'{API_BASE_URL}/empresas/{empresa.id}/publish/',
+            {},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        empresa.refresh_from_db()
+        self.assertFalse(empresa.has_pending_review_changes)
+        self.assertIsNotNone(empresa.last_release_at)
+        self.assertGreater(empresa.next_release_at, empresa.last_release_at)
+
+        self.assertTrue(
+            Notificacion.objects.filter(
+                usuario_destino=empresa.user,
+                tipo=Notificacion.TIPO_REVISION_FECHA_LIMITE
+            ).exists()
+        )
 
     def test_delete_empresa(self):
         """Test DELETE /empresas/{id}/ - Eliminar empresa"""

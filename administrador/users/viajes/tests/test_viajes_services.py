@@ -168,12 +168,14 @@ class ProcesarRevisionServiceTest(ViajesServicesBase):
         viaje.refresh_from_db()
         dia_obj.refresh_from_db()
         gasto = Gasto.objects.get(viaje=viaje)
+        self.empresa.refresh_from_db()
 
         self.assertEqual(viaje.estado, "REVISADO")
         self.assertTrue(dia_obj.revisado)
         self.assertFalse(dia_obj.exento)
         self.assertEqual(gasto.estado, "RECHAZADO")
         self.assertEqual(resultado["dias_procesados"], 3)
+        self.assertTrue(self.empresa.has_pending_review_changes)
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
@@ -279,12 +281,14 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.viaje.refresh_from_db()
         self.dia.refresh_from_db()
         self.gasto.refresh_from_db()
+        self.empresa.refresh_from_db()
 
         self.assertEqual(self.viaje.estado, "REVISADO")
         self.assertTrue(self.dia.revisado)
         self.assertFalse(self.dia.exento)
         self.assertEqual(self.gasto.estado, "RECHAZADO")
         self.assertEqual(response.data["resultado"]["dias_no_exentos"], 1)
+        self.assertTrue(self.empresa.has_pending_review_changes)
 
     def test_no_puede_finalizar_con_dias_pendientes(self):
         self.viaje.estado = "EN_REVISION"
@@ -314,6 +318,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.viaje.refresh_from_db()
         self.dia.refresh_from_db()
         self.gasto.refresh_from_db()
+        self.empresa.refresh_from_db()
         self.client.credentials()
         return response
 
@@ -325,6 +330,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.assertEqual(self.viaje.estado, "REABIERTO")
         self.assertFalse(self.viaje.dias.filter(revisado=True).exists())
         self.assertEqual(self.gasto.estado, "PENDIENTE")
+        self.assertTrue(self.empresa.has_pending_review_changes)
 
     def test_no_reabre_si_no_esta_revisado(self):
         self.viaje.estado = "EN_REVISION"
@@ -383,6 +389,21 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.gasto.refresh_from_db()
         self.assertTrue(self.gasto.comprobante.name.endswith("ticket.pdf"))
+
+    def test_aprobar_gasto_marca_pendiente(self):
+        self.empresa.has_pending_review_changes = False
+        self.empresa.save(update_fields=["has_pending_review_changes"])
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        response = self.client.put(
+            f"/api/users/gastos/{self.gasto.id}/",
+            {"estado": "RECHAZADO"},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.empresa.refresh_from_db()
+        self.assertTrue(self.empresa.has_pending_review_changes)
 
 
 class EliminarViajeViewTest(TestCase):

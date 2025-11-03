@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 import re
 from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
-    DiaViaje, Conversacion, Mensaje
+    DiaViaje, Conversacion, Mensaje, ViajeReviewSnapshot, GastoReviewSnapshot
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -30,8 +30,26 @@ class EmpresaProfileSerializer(serializers.ModelSerializer):
             'postal_code',
             'correo_contacto',
             'permisos',
+            'periodicity',
+            'last_release_at',
+            'next_release_at',
+            'manual_release_at',
+            'force_release',
+            'has_pending_review_changes',
             'role'
         ]
+        read_only_fields = [
+            'last_release_at',
+            'next_release_at',
+            'force_release',
+            'has_pending_review_changes',
+            'role',
+            'user_id',
+        ]
+        extra_kwargs = {
+            'manual_release_at': {'allow_null': True, 'required': False},
+            'periodicity': {'required': False},
+        }
 
 
 EMAIL_UNICODE_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', re.UNICODE)
@@ -404,6 +422,117 @@ class ViajeWithGastosSerializer(ViajeSerializer):
     class Meta(ViajeSerializer.Meta):
         fields = ViajeSerializer.Meta.fields + ['gastos']
         read_only_fields = ViajeSerializer.Meta.read_only_fields + ['gastos']
+
+
+class ViajeSnapshotSerializer(serializers.Serializer):
+    """Serializa snapshots publicados de viajes revisados."""
+
+    id = serializers.IntegerField(source='viaje_id')
+    empleado = serializers.SerializerMethodField()
+    empresa = serializers.SerializerMethodField()
+    destino = serializers.CharField()
+    ciudad = serializers.CharField(allow_null=True)
+    pais = serializers.CharField(allow_null=True)
+    es_internacional = serializers.BooleanField()
+    fecha_inicio = serializers.DateField()
+    fecha_fin = serializers.DateField()
+    estado = serializers.CharField()
+    fecha_solicitud = serializers.SerializerMethodField()
+    empresa_visitada = serializers.CharField(allow_null=True)
+    motivo = serializers.CharField(allow_null=True)
+    dias_viajados = serializers.IntegerField()
+    notas = serializers.SerializerMethodField()
+    gastos = serializers.SerializerMethodField()
+
+    def _get_request_context(self):
+        return self.context.get('request') if isinstance(self.context, dict) else None
+
+    def get_empleado(self, obj):
+        if not obj.empleado_id:
+            return None
+        return EmpleadoProfileSerializer(obj.empleado, context=self.context).data
+
+    def get_empresa(self, obj):
+        if not obj.empresa_id:
+            return None
+        return EmpresaProfileSerializer(obj.empresa, context=self.context).data
+
+    def get_fecha_solicitud(self, obj):
+        if obj.viaje_id and obj.viaje:
+            return obj.viaje.fecha_solicitud
+        return None
+
+    def get_notas(self, obj):
+        viaje = getattr(obj, "viaje", None)
+        if not viaje:
+            return []
+        notas_qs = viaje.notas.all()
+        return NotaViajeSerializer(notas_qs, many=True, context=self.context).data
+
+    def get_gastos(self, obj):
+        if not self.context.get('include_gastos'):
+            return []
+
+        serializer = GastoSnapshotSerializer(
+            obj.gastos_snapshot.all(),
+            many=True,
+            context={'request': self._get_request_context()}
+        )
+        return serializer.data
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.context.get('include_gastos'):
+            data.pop('gastos', None)
+        return data
+
+
+class GastoSnapshotSerializer(serializers.Serializer):
+    """Serializa snapshot de gasto usando valores congelados."""
+
+    def to_representation(self, snapshot: GastoReviewSnapshot):
+        gasto = getattr(snapshot, 'gasto', None)
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+
+        if gasto:
+            data = GastoSerializer(gasto, context={'request': request}).data
+        else:
+            # construir estructura básica si el gasto fue borrado
+            data = {
+                'id': snapshot.gasto_id,
+                'concepto': snapshot.concepto,
+                'monto': str(snapshot.monto),
+                'fecha_gasto': snapshot.fecha_gasto,
+                'estado': snapshot.estado,
+                'fecha_solicitud': None,
+                'comprobante': None,
+                'empleado': EmpleadoProfileSerializer(snapshot.empleado).data if snapshot.empleado_id else None,
+                'empresa': EmpresaProfileSerializer(snapshot.empresa).data if snapshot.empresa_id else None,
+                'empleado_id': snapshot.empleado_id,
+                'empresa_id': snapshot.empresa_id,
+                'viaje': None,
+                'viaje_id': snapshot.viaje_snapshot.viaje_id if snapshot.viaje_snapshot else None,
+            }
+
+        # Sobrescribir campos congelados
+        data['concepto'] = snapshot.concepto
+        data['monto'] = str(snapshot.monto)
+        data['estado'] = snapshot.estado
+        data['fecha_gasto'] = snapshot.fecha_gasto.isoformat() if snapshot.fecha_gasto else None
+        data['id'] = snapshot.gasto_id
+        data['viaje_id'] = snapshot.viaje_snapshot.viaje_id if snapshot.viaje_snapshot else data.get('viaje_id')
+
+        if 'viaje' in data and data['viaje'] and snapshot.viaje_snapshot:
+            viaje = snapshot.viaje_snapshot
+            data['viaje'] = {
+                'id': viaje.viaje_id,
+                'destino': viaje.destino,
+                'fecha_inicio': viaje.fecha_inicio,
+                'fecha_fin': viaje.fecha_fin,
+                'estado': viaje.estado,
+            }
+
+        return data
 
 
 class NotificacionSerializer(serializers.ModelSerializer):

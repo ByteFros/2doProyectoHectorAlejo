@@ -106,6 +106,32 @@ class ConversacionCreationTest(TestCase):
         self.assertEqual(resp_dup.status_code, 400)
         self.assertEqual(Conversacion.objects.count(), 2)
 
+    def test_empleado_contacta_master(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.empleado_token.key}')
+
+        payload_master = {"user_id": self.master_user.id}
+        response = self.client.post(f'{API_BASE}/conversaciones/crear/', payload_master, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Conversacion.objects.count(), 1)
+
+        # no debe permitir duplicado
+        response_dup = self.client.post(f'{API_BASE}/conversaciones/crear/', payload_master, format='json')
+        self.assertEqual(response_dup.status_code, 400)
+        self.assertEqual(Conversacion.objects.count(), 1)
+
+    def test_master_contacta_otro_master(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+
+        payload = {"user_id": self.master_user_2.id}
+        response = self.client.post(f'{API_BASE}/conversaciones/crear/', payload, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Conversacion.objects.count(), 1)
+
+        # evitar duplicados
+        response_dup = self.client.post(f'{API_BASE}/conversaciones/crear/', payload, format='json')
+        self.assertEqual(response_dup.status_code, 400)
+        self.assertEqual(Conversacion.objects.count(), 1)
+
     def test_contact_list_for_master(self):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
 

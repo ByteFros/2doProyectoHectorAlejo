@@ -12,7 +12,14 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import EmpresaProfile, Viaje, DiaViaje, EmpleadoProfile
+from users.models import (
+    EmpresaProfile,
+    Viaje,
+    DiaViaje,
+    EmpleadoProfile,
+    ViajeReviewSnapshot,
+    DiaViajeReviewSnapshot,
+)
 from users.serializers import (
     CompanyTripsSummarySerializer,
     TripsPerMonthSerializer,
@@ -20,7 +27,12 @@ from users.serializers import (
     ExemptDaysSerializer,
     GeneralInfoSerializer
 )
-from users.common.services import get_user_empresa, get_user_empleado
+from users.common.services import (
+    get_user_empresa,
+    get_user_empleado,
+    get_visible_viajes_queryset,
+    get_visible_dias_queryset,
+)
 from users.common.exceptions import (
     EmpresaProfileNotFoundError,
     EmpleadoProfileNotFoundError,
@@ -44,29 +56,31 @@ class CompanyTripsSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Solo MASTER o EMPRESA
-        if request.user.role not in ('MASTER', 'EMPRESA'):
-            raise UnauthorizedAccessError("No autorizado para ver resúmenes de empresas")
-
-        # Detectar si se solicita incluir empleados
         include_empleados = 'empleados' in request.query_params.get('include', '')
 
-        # TODO: Implementar Prefetch aquí cuando include_empleados=True
-
-        # Base de empresas permitidas según el rol
-        qs = EmpresaProfile.objects.all()
-        if request.user.role == 'EMPRESA':
+        if request.user.role == 'MASTER':
+            data = self._get_master_summary(include_empleados)
+        elif request.user.role == 'EMPRESA':
             empresa = get_user_empresa(request.user)
             if not empresa:
                 raise EmpresaProfileNotFoundError()
-            qs = qs.filter(pk=empresa.pk)
+            visible_viajes = get_visible_viajes_queryset(request.user)
+            data = self._get_empresa_summary(empresa, visible_viajes, include_empleados)
+        else:
+            raise UnauthorizedAccessError("No autorizado para ver resúmenes de empresas")
 
-        # Base de viajes (ambos estados (EN_REVISION y REVISADO)) por empresa
+        serializer = CompanyTripsSummarySerializer(data, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def _get_master_summary(self, include_empleados: bool):
+        """
+        Construye el resumen usando los modelos en vivo (acceso MASTER).
+        """
         viajes = Viaje.objects.filter(
-            empleado__empresa=OuterRef('pk')
+            empleado__empresa=OuterRef('pk'),
+            estado__in=('EN_REVISION', 'REVISADO', 'REABIERTO')
         )
 
-        # Subquery para trips (número de viajes, ambos estados (EN_REVISION y REVISADO))
         trips_sq = (
             viajes
             .order_by()
@@ -75,7 +89,6 @@ class CompanyTripsSummaryView(APIView):
             .values('count')
         )
 
-        # Subquery para days (suma de dias_viajados)
         days_sq = (
             viajes
             .order_by()
@@ -84,36 +97,31 @@ class CompanyTripsSummaryView(APIView):
             .values('total')
         )
 
-        # Subquery para exemptDays (días exentos)
         exempt_sq = (
             DiaViaje.objects
             .filter(
                 viaje__empleado__empresa=OuterRef('pk'),
                 exento=True
             )
-            
             .order_by()
             .values('viaje__empleado__empresa')
             .annotate(count=Count('pk'))
             .values('count')
         )
 
-        # Subquery para nonExemptDays (días no exentos)
         nonexempt_sq = (
             DiaViaje.objects
             .filter(
                 viaje__empleado__empresa=OuterRef('pk'),
                 exento=False
             )
-            
             .order_by()
             .values('viaje__empleado__empresa')
             .annotate(count=Count('pk'))
             .values('count')
         )
 
-        # Annotate la QS principal
-        qs = qs.annotate(
+        empresas = EmpresaProfile.objects.annotate(
             trips=Coalesce(
                 Subquery(trips_sq, output_field=IntegerField()),
                 Value(0)
@@ -132,31 +140,25 @@ class CompanyTripsSummaryView(APIView):
             ),
         )
 
-        # Serializar la respuesta
         data = []
-        for e in qs:
-            empresa_data = {
-                'empresa_id': e.id,
-                'empresa': e.nombre_empresa,
-                'trips': e.trips,
-                'days': e.days,
-                'exemptDays': e.exemptDays,
-                'nonExemptDays': e.nonExemptDays,
+        for empresa in empresas:
+            payload = {
+                'empresa_id': empresa.id,
+                'empresa': empresa.nombre_empresa,
+                'trips': empresa.trips,
+                'days': empresa.days,
+                'exemptDays': empresa.exemptDays,
+                'nonExemptDays': empresa.nonExemptDays,
             }
-
-            # Si se solicita, agregar desglose de empleados
             if include_empleados:
-                empresa_data['empleados'] = self._get_empleados_stats(e)
+                payload['empleados'] = self._get_master_empleados_stats(empresa)
+            data.append(payload)
+        return data
 
-            data.append(empresa_data)
-
-        serializer = CompanyTripsSummarySerializer(data, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def _get_empleados_stats(self, empresa):
+    def _get_master_empleados_stats(self, empresa):
         """
         Obtiene estadísticas de empleados para una empresa específica
-        Reutiliza la lógica de EmployeeTripsSummaryView
+        utilizando los modelos en vivo (flujo MASTER).
         """
         # Subqueries para cada empleado (ambos estados (EN_REVISION y REVISADO))
         viajes_qs = Viaje.objects.filter(
@@ -213,6 +215,106 @@ class CompanyTripsSummaryView(APIView):
             'nonExemptDays': emp.nonExemptDays,
         } for emp in empleados]
 
+    def _get_empresa_summary(self, empresa, visible_viajes, include_empleados: bool):
+        """
+        Construye el resumen usando snapshots publicados para EMPRESA.
+        """
+        snapshots = visible_viajes.queryset.filter(empresa=empresa)
+
+        trips = snapshots.count()
+        days = snapshots.aggregate(
+            total=Coalesce(Sum('dias_viajados'), Value(0))
+        )['total'] or 0
+
+        dias_qs = get_visible_dias_queryset(visible_viajes).filter(
+            viaje_snapshot__empresa=empresa
+        )
+        exempt_days = dias_qs.filter(exento=True).count()
+        non_exempt_days = dias_qs.filter(exento=False).count()
+
+        empresa_data = {
+            'empresa_id': empresa.id,
+            'empresa': empresa.nombre_empresa,
+            'trips': trips,
+            'days': days,
+            'exemptDays': exempt_days,
+            'nonExemptDays': non_exempt_days,
+        }
+
+        if include_empleados:
+            empresa_data['empleados'] = self._get_empresa_empleados_stats(
+                empresa,
+                snapshots,
+                dias_qs
+            )
+
+        return [empresa_data]
+
+    def _get_empresa_empleados_stats(self, empresa, snapshots, dias_qs):
+        """
+        Calcula métricas de empleados a partir de snapshots publicados.
+        """
+        empleado_ids = list(
+            snapshots.values_list('empleado_id', flat=True).distinct()
+        )
+        if not empleado_ids:
+            return []
+
+        empleados = EmpleadoProfile.objects.filter(
+            id__in=empleado_ids,
+            empresa=empresa
+        ).select_related('user')
+
+        trips_agg = {
+            row['empleado_id']: row['trips']
+            for row in snapshots.values('empleado_id').annotate(
+                trips=Count('id')
+            )
+        }
+        days_agg = {
+            row['empleado_id']: row['days']
+            for row in snapshots.values('empleado_id').annotate(
+                days=Coalesce(Sum('dias_viajados'), Value(0))
+            )
+        }
+
+        exempt_agg = {
+            row['viaje_snapshot__empleado_id']: row['total']
+            for row in dias_qs.filter(exento=True).values(
+                'viaje_snapshot__empleado_id'
+            ).annotate(total=Count('id'))
+        }
+        non_exempt_agg = {
+            row['viaje_snapshot__empleado_id']: row['total']
+            for row in dias_qs.filter(exento=False).values(
+                'viaje_snapshot__empleado_id'
+            ).annotate(total=Count('id'))
+        }
+
+        data = []
+        for empleado in empleados:
+            trips = trips_agg.get(empleado.id, 0)
+            days = days_agg.get(empleado.id, 0)
+            exempt = exempt_agg.get(empleado.id, 0)
+            non_exempt = non_exempt_agg.get(empleado.id, 0)
+
+            # Evitar incluir empleados sin métricas relevantes
+            if not any([trips, days, exempt, non_exempt]):
+                continue
+
+            data.append({
+                'empleado_id': empleado.id,
+                'nombre': empleado.nombre,
+                'apellido': empleado.apellido,
+                'email': empleado.user.email,
+                'trips': trips,
+                'travelDays': days,
+                'exemptDays': exempt,
+                'nonExemptDays': non_exempt,
+            })
+
+        return data
+
 
 class TripsPerMonthView(APIView):
     """
@@ -226,23 +328,23 @@ class TripsPerMonthView(APIView):
 
     def get(self, request):
         user = request.user
-        viajes = Viaje.objects.all()
-
-        # Filtrado por rol
         if user.role == "EMPRESA":
             empresa = get_user_empresa(user)
             if not empresa:
                 raise EmpresaProfileNotFoundError()
-            viajes = viajes.filter(empleado__empresa=empresa)
-
         elif user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             if not empleado:
                 raise EmpleadoProfileNotFoundError()
-            viajes = viajes.filter(empleado=empleado)
-
         elif user.role != "MASTER":
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
+
+        try:
+            visible_viajes = get_visible_viajes_queryset(user)
+        except ValueError as exc:
+            raise UnauthorizedAccessError(str(exc))
+
+        viajes = visible_viajes.queryset
 
         # Filtrado por año (opcional)
         year_param = request.query_params.get('year')
@@ -295,29 +397,27 @@ class TripsTypeView(APIView):
     def get(self, request):
         user = request.user
 
-        # Base queryset
-        viajes = Viaje.objects.filter(estado='REVISADO')
-
-        # Filtrado por rol
         if user.role == "EMPRESA":
             empresa = get_user_empresa(user)
             if not empresa:
                 raise EmpresaProfileNotFoundError()
-            viajes = viajes.filter(empleado__empresa=empresa)
-
         elif user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             if not empleado:
                 raise EmpleadoProfileNotFoundError()
-            viajes = viajes.filter(empleado=empleado)
-
         elif user.role != "MASTER":
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
-        # Conteo nacional vs internacional
+        try:
+            visible_viajes = get_visible_viajes_queryset(user)
+        except ValueError as exc:
+            raise UnauthorizedAccessError(str(exc))
+
+        viajes = visible_viajes.queryset.filter(estado='REVISADO')
+
         national = viajes.filter(es_internacional=False).count()
         international = viajes.filter(es_internacional=True).count()
-        total_days = viajes.aggregate(total=Coalesce(Sum('dias_viajados'), Value(0)))['total']
+        total_days = viajes.aggregate(total=Coalesce(Sum('dias_viajados'), Value(0)))['total'] or 0
 
         total = national + international
 
@@ -339,26 +439,31 @@ class ExemptDaysView(APIView):
 
     def get(self, request):
         user = request.user
-        qs = DiaViaje.objects.filter(viaje__estado='REVISADO')
-
-        # Filtrado por rol
         if user.role == "EMPRESA":
             empresa = get_user_empresa(user)
             if not empresa:
                 raise EmpresaProfileNotFoundError()
-            qs = qs.filter(viaje__empleado__empresa=empresa)
-
         elif user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             if not empleado:
                 raise EmpleadoProfileNotFoundError()
-            qs = qs.filter(viaje__empleado=empleado)
-
         elif user.role != "MASTER":
             raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
-        exempt_count = qs.filter(exento=True).count()
-        non_exempt_count = qs.filter(exento=False).count()
+        try:
+            visible_viajes = get_visible_viajes_queryset(user)
+        except ValueError as exc:
+            raise UnauthorizedAccessError(str(exc))
+
+        dias_qs = get_visible_dias_queryset(visible_viajes)
+
+        if visible_viajes.uses_snapshot:
+            exempt_count = dias_qs.filter(exento=True).count()
+            non_exempt_count = dias_qs.filter(exento=False).count()
+        else:
+            dias_qs = dias_qs.filter(viaje__estado='REVISADO')
+            exempt_count = dias_qs.filter(exento=True).count()
+            non_exempt_count = dias_qs.filter(exento=False).count()
 
         data = {
             'exempt': exempt_count,
@@ -391,10 +496,11 @@ class GeneralInfoView(APIView):
                 raise EmpresaProfileNotFoundError()
             companies = 1
             employees = EmpleadoProfile.objects.filter(empresa=empresa).count()
-            viajes_qs = Viaje.objects.filter(
-                estado='REVISADO',
-                empleado__empresa=empresa
-            )
+            try:
+                visible_viajes = get_visible_viajes_queryset(user)
+            except ValueError as exc:
+                raise UnauthorizedAccessError(str(exc))
+            viajes_qs = visible_viajes.queryset.filter(estado='REVISADO')
 
         # EMPLEADO: sólo él
         elif user.role == "EMPLEADO":
@@ -403,10 +509,11 @@ class GeneralInfoView(APIView):
                 raise EmpleadoProfileNotFoundError()
             companies = 1
             employees = 1
-            viajes_qs = Viaje.objects.filter(
-                estado='REVISADO',
-                empleado=empleado
-            )
+            try:
+                visible_viajes = get_visible_viajes_queryset(user)
+            except ValueError as exc:
+                raise UnauthorizedAccessError(str(exc))
+            viajes_qs = visible_viajes.queryset.filter(estado='REVISADO')
 
         else:
             raise UnauthorizedAccessError("No autorizado")

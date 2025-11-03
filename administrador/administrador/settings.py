@@ -178,6 +178,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://crowe_frontend:5173",     # Nombre del servicio en Docker
     "http://crowe_backend:8000",     # Nombre del servicio en Docker
+    "http://10.10.0.197:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

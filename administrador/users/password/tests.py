@@ -152,7 +152,8 @@ class PasswordManagementTestCase(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
         data = {
             'old_password': 'oldpassword123',
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.put(url, data)
 
@@ -180,7 +181,8 @@ class PasswordManagementTestCase(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
         data = {
             'old_password': 'wrongpassword',
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.put(url, data)
 
@@ -202,7 +204,8 @@ class PasswordManagementTestCase(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
         data = {
             'old_password': 'oldpassword123',
-            'new_password': 'oldpassword123'
+            'new_password': 'oldpassword123',
+            'confirm_password': 'oldpassword123'
         }
         response = self.client.put(url, data)
 
@@ -210,8 +213,8 @@ class PasswordManagementTestCase(TestCase):
         # El serializer devuelve errores por campo
         self.assertTrue('new_password' in response.data or 'error' in response.data)
 
-    def test_change_password_master_forbidden(self):
-        """Test: Usuario MASTER no puede usar cambio de contraseña"""
+    def test_change_password_master_allowed(self):
+        """Test: Usuario MASTER puede cambiar su contraseña"""
         # Login como master
         login_url = reverse('login')
         login_response = self.client.post(login_url, {
@@ -225,19 +228,25 @@ class PasswordManagementTestCase(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
         data = {
             'old_password': 'masterpass123',
-            'new_password': 'newmasterpass123'
+            'new_password': 'newmasterpass123',
+            'confirm_password': 'newmasterpass123'
         }
         response = self.client.put(url, data)
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('error', response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('message', response.data)
+        # Verificar cambio de contraseña
+        self.master.refresh_from_db()
+        self.assertTrue(self.master.check_password('newmasterpass123'))
+        self.assertFalse(self.master.must_change_password)
 
     def test_change_password_without_authentication(self):
         """Test: Cambio de contraseña sin autenticación"""
         url = reverse('change_password')
         data = {
             'old_password': 'oldpassword123',
-            'new_password': 'newpassword123'
+            'new_password': 'newpassword123',
+            'confirm_password': 'newpassword123'
         }
         response = self.client.put(url, data)
 
@@ -259,7 +268,8 @@ class PasswordManagementTestCase(TestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
         data = {
             'old_password': 'oldpassword123',
-            'new_password': 'short'  # Menos de 8 caracteres
+            'new_password': 'short',  # Menos de 8 caracteres
+            'confirm_password': 'short'
         }
         response = self.client.put(url, data)
 

@@ -17,8 +17,16 @@ from users.serializers import (
     ViajeWithGastosSerializer,
     EmpleadoProfileSerializer,
     EmpresaProfileSerializer,
+    ViajeSnapshotSerializer,
+    GastoSerializer,
+    GastoSnapshotSerializer,
 )
-from users.common.services import get_user_empleado, get_user_empresa
+from users.common.services import (
+    get_user_empleado,
+    get_user_empresa,
+    get_visible_viajes_queryset,
+    get_visible_gastos_queryset,
+)
 from users.common.exceptions import (
     EmpleadoProfileNotFoundError,
     EmpresaProfileNotFoundError,
@@ -98,52 +106,45 @@ class ListarViajesRevisadosView(APIView):
             for part in request.query_params.get('include', '').split(',')
             if part.strip()
         }
-        serializer_class = ViajeSerializer
-        prefetches = []
-        if 'gastos' in include:
-            serializer_class = ViajeWithGastosSerializer
-            prefetches.append(
-                Prefetch(
-                    'gasto_set',
-                    queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
-                )
-            )
+        include_gastos = 'gastos' in include
 
-        if user.role == "MASTER":
-            viajes = Viaje.objects.filter(estado="REVISADO")
+        visible_viajes = get_visible_viajes_queryset(user)
 
-        elif user.role == "EMPRESA":
-            empresa = get_user_empresa(user)
-            if not empresa:
-                raise EmpresaProfileNotFoundError()
-            viajes = Viaje.objects.filter(
-                empleado__empresa=empresa,
-                estado="REVISADO"
-            )
+        if visible_viajes.uses_snapshot:
+            snapshots = visible_viajes.queryset
+            if include_gastos:
+                snapshots = snapshots.prefetch_related('gastos_snapshot', 'gastos_snapshot__gasto')
 
-        elif user.role == "EMPLEADO":
-            empleado = get_user_empleado(user)
-            if not empleado:
-                raise EmpleadoProfileNotFoundError()
-            viajes = Viaje.objects.filter(
-                empleado=empleado,
-                estado="REVISADO"
+            serializer = ViajeSnapshotSerializer(
+                snapshots,
+                many=True,
+                context={'request': request, 'include_gastos': include_gastos}
             )
+            data = serializer.data
 
         else:
-            raise UnauthorizedAccessError("Rol de usuario no reconocido")
+            if user.role != "MASTER":
+                raise UnauthorizedAccessError("Rol de usuario no reconocido")
 
-        if prefetches:
-            viajes = viajes.prefetch_related(*prefetches)
+            viajes = visible_viajes.queryset.filter(estado="REVISADO")
 
-        serializer = serializer_class(viajes, many=True, context={'request': request})
-        data = serializer.data
+            serializer_class = ViajeWithGastosSerializer if include_gastos else ViajeSerializer
+            if include_gastos:
+                viajes = viajes.prefetch_related(
+                    Prefetch(
+                        'gasto_set',
+                        queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+                    )
+                )
+
+            serializer = serializer_class(viajes, many=True, context={'request': request})
+            data = serializer.data
 
         if user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             empresa = empleado.empresa if empleado else None
-            employee_data = EmpleadoProfileSerializer(empleado).data if empleado else None
-            company_data = EmpresaProfileSerializer(empresa).data if empresa else None
+            employee_data = EmpleadoProfileSerializer(empleado, context={'request': request}).data if empleado else None
+            company_data = EmpresaProfileSerializer(empresa, context={'request': request}).data if empresa else None
 
             for trip in data:
                 trip.pop('empleado', None)
@@ -205,48 +206,71 @@ class ListarTodosLosViajesView(APIView):
             for part in request.query_params.get('include', '').split(',')
             if part.strip()
         }
-        serializer_class = ViajeSerializer
-        prefetches = []
-        if 'gastos' in include:
-            serializer_class = ViajeWithGastosSerializer
-            prefetches.append(
-                Prefetch(
-                    'gasto_set',
-                    queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+        include_gastos = 'gastos' in include
+        visible_viajes = get_visible_viajes_queryset(user)
+        data = []
+
+        if visible_viajes.uses_snapshot:
+            snapshots = visible_viajes.queryset
+            if include_gastos:
+                snapshots = snapshots.prefetch_related('gastos_snapshot', 'gastos_snapshot__gasto')
+
+            snapshot_serializer = ViajeSnapshotSerializer(
+                snapshots,
+                many=True,
+                context={'request': request, 'include_gastos': include_gastos}
+            )
+            data.extend(snapshot_serializer.data)
+
+            if user.role == "EMPRESA":
+                empresa = get_user_empresa(user)
+                if not empresa:
+                    raise EmpresaProfileNotFoundError()
+                live_qs = Viaje.objects.filter(empleado__empresa=empresa).exclude(estado="REVISADO")
+            elif user.role == "EMPLEADO":
+                empleado = get_user_empleado(user)
+                if not empleado:
+                    raise EmpleadoProfileNotFoundError()
+                live_qs = Viaje.objects.filter(empleado=empleado).exclude(estado="REVISADO")
+            else:
+                live_qs = Viaje.objects.none()
+
+            serializer_class = ViajeWithGastosSerializer if include_gastos else ViajeSerializer
+            if include_gastos:
+                live_qs = live_qs.prefetch_related(
+                    Prefetch(
+                        'gasto_set',
+                        queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+                    )
                 )
-            )
 
-        if user.role == "MASTER":
-            viajes = Viaje.objects.all()
-
-        elif user.role == "EMPRESA":
-            empresa = get_user_empresa(user)
-            if not empresa:
-                raise EmpresaProfileNotFoundError()
-            viajes = Viaje.objects.filter(
-                empleado__empresa=empresa
-            )
-
-        elif user.role == "EMPLEADO":
-            empleado = get_user_empleado(user)
-            if not empleado:
-                raise EmpleadoProfileNotFoundError()
-            viajes = Viaje.objects.filter(empleado=empleado)
+            live_serializer = serializer_class(live_qs, many=True, context={'request': request})
+            data.extend(live_serializer.data)
 
         else:
-            raise UnauthorizedAccessError("Rol de usuario no reconocido")
+            if user.role != "MASTER":
+                raise UnauthorizedAccessError("No autorizado")
 
-        if prefetches:
-            viajes = viajes.prefetch_related(*prefetches)
+            viajes_qs = visible_viajes.queryset
+            serializer_class = ViajeWithGastosSerializer if include_gastos else ViajeSerializer
+            if include_gastos:
+                viajes_qs = viajes_qs.prefetch_related(
+                    Prefetch(
+                        'gasto_set',
+                        queryset=Gasto.objects.select_related('empleado', 'empresa').order_by('fecha_gasto', 'id')
+                    )
+                )
 
-        serializer = serializer_class(viajes, many=True, context={'request': request})
-        data = serializer.data
+            serializer = serializer_class(viajes_qs, many=True, context={'request': request})
+            data = serializer.data
+
+        data.sort(key=lambda trip: trip.get('fecha_inicio') or '', reverse=True)
 
         if user.role == "EMPLEADO":
             empleado = get_user_empleado(user)
             empresa = empleado.empresa if empleado else None
-            employee_data = EmpleadoProfileSerializer(empleado).data if empleado else None
-            company_data = EmpresaProfileSerializer(empresa).data if empresa else None
+            employee_data = EmpleadoProfileSerializer(empleado, context={'request': request}).data if empleado else None
+            company_data = EmpresaProfileSerializer(empresa, context={'request': request}).data if empresa else None
 
             for trip in data:
                 trip.pop('empleado', None)

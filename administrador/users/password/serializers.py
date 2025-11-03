@@ -47,9 +47,26 @@ class ChangePasswordSerializer(serializers.Serializer):
         write_only=True,
         help_text="Nueva contraseña (mínimo 8 caracteres)"
     )
+    confirm_password = serializers.CharField(
+        required=True,
+        min_length=8,
+        write_only=True,
+        help_text="Debe coincidir con la nueva contraseña"
+    )
 
     def validate(self, data):
         """Validar que las contraseñas no sean iguales"""
+        confirm = data.pop('confirm_password', None)
+        if confirm is None:
+            raise serializers.ValidationError({
+                "confirm_password": "Este campo es obligatorio."
+            })
+
+        if data['new_password'] != confirm:
+            raise serializers.ValidationError({
+                "confirm_password": "Las contraseñas no coinciden."
+            })
+
         if data['old_password'] == data['new_password']:
             raise serializers.ValidationError({
                 "new_password": "La nueva contraseña no puede ser igual a la anterior."

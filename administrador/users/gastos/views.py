@@ -12,8 +12,13 @@ from rest_framework.views import APIView
 import mimetypes
 
 from users.models import Gasto, Viaje
-from users.serializers import GastoSerializer
-from users.common.services import get_user_empleado, get_user_empresa
+from users.serializers import GastoSerializer, GastoSnapshotSerializer
+from users.common.services import (
+    get_user_empleado,
+    get_user_empresa,
+    get_visible_viajes_queryset,
+    get_visible_gastos_queryset,
+)
 from users.common.exceptions import (
     EmpleadoProfileNotFoundError,
     EmpresaProfileNotFoundError,
@@ -103,13 +108,43 @@ class GastoListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        gastos = obtener_gastos_por_rol(request.user)
+        user = request.user
 
-        if gastos is None:
+        if user.role == "MASTER":
+            gastos = obtener_gastos_por_rol(user)
+            serializer = GastoSerializer(gastos, many=True, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        if user.role == "EMPRESA":
+            empresa = get_user_empresa(user)
+            if not empresa:
+                raise EmpresaProfileNotFoundError()
+            live_qs = Gasto.objects.filter(empresa=empresa).exclude(viaje__estado="REVISADO")
+
+        elif user.role == "EMPLEADO":
+            empleado = get_user_empleado(user)
+            if not empleado:
+                raise EmpleadoProfileNotFoundError()
+            live_qs = Gasto.objects.filter(empleado=empleado).exclude(viaje__estado="REVISADO")
+
+        else:
             raise UnauthorizedAccessError("No autorizado")
 
-        serializer = GastoSerializer(gastos, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        visible_viajes = get_visible_viajes_queryset(user)
+
+        snapshot_data = []
+        if visible_viajes.uses_snapshot:
+            snapshot_qs = get_visible_gastos_queryset(visible_viajes).select_related('gasto', 'viaje_snapshot')
+            snapshot_serializer = GastoSnapshotSerializer(snapshot_qs, many=True, context={'request': request})
+            snapshot_data = snapshot_serializer.data
+
+        live_serializer = GastoSerializer(live_qs, many=True, context={'request': request})
+        live_data = live_serializer.data
+
+        combined = snapshot_data + list(live_data)
+        combined.sort(key=lambda item: item.get('fecha_solicitud') or '', reverse=True)
+
+        return Response(combined, status=status.HTTP_200_OK)
 
 
 class GastoUpdateDeleteView(APIView):

@@ -4,6 +4,7 @@ Servicios de lógica de negocio para gastos
 from typing import Dict, Optional
 from django.core.files.uploadedfile import UploadedFile
 from users.models import Gasto, EmpleadoProfile, EmpresaProfile, Viaje
+from users.common.services import mark_company_review_pending
 
 
 # ============================================================================
@@ -127,6 +128,10 @@ def actualizar_gasto(
         gasto.descripcion = descripcion
 
     gasto.save()
+
+    if gasto.empresa and gasto.viaje and gasto.viaje.estado == "REVISADO":
+        mark_company_review_pending(gasto.empresa)
+
     return gasto
 
 
@@ -148,6 +153,10 @@ def aprobar_rechazar_gasto(gasto: Gasto, nuevo_estado: str) -> Gasto:
 
     gasto.estado = nuevo_estado
     gasto.save()
+
+    if gasto.empresa and gasto.viaje and gasto.viaje.estado == "REVISADO":
+        mark_company_review_pending(gasto.empresa)
+
     return gasto
 
 
@@ -158,7 +167,12 @@ def eliminar_gasto(gasto: Gasto) -> None:
     Args:
         gasto: Gasto a eliminar
     """
+    empresa = gasto.empresa
+    viaje = gasto.viaje
     gasto.delete()
+
+    if empresa and viaje and viaje.estado == "REVISADO":
+        mark_company_review_pending(empresa)
 
 
 def puede_gestionar_gasto(usuario, gasto: Gasto) -> bool:

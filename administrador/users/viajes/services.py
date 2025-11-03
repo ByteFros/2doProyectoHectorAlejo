@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, List
 from django.db import transaction
 from users.models import Viaje, EmpleadoProfile, DiaViaje, Gasto
+from users.common.services import mark_company_review_pending
 
 
 # ============================================================================
@@ -219,6 +220,8 @@ def procesar_revision_viaje(
     viaje.estado = "REVISADO"
     viaje.save()
 
+    mark_company_review_pending(viaje.empresa)
+
     return {
         "viaje_id": viaje.id,
         "dias_procesados": len(dias_viaje),
@@ -274,6 +277,8 @@ def cambiar_estado_viaje(
         viaje.estado = "REVISADO"
         viaje.save(update_fields=["estado"])
 
+        mark_company_review_pending(viaje.empresa)
+
         return {
             "nuevo_estado": "REVISADO",
             "viaje_id": viaje.id,
@@ -290,6 +295,8 @@ def cambiar_estado_viaje(
 
     viaje.dias.update(revisado=False)
     Gasto.objects.filter(viaje=viaje).exclude(estado='PENDIENTE').update(estado='PENDIENTE')
+
+    mark_company_review_pending(viaje.empresa)
 
     return {"nuevo_estado": "REABIERTO", "viaje_id": viaje.id}
 
