@@ -1,3 +1,5 @@
+import os
+
 from django.core.management.base import BaseCommand
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 
@@ -6,13 +8,35 @@ class Command(BaseCommand):
     help = "Crea usuarios de prueba: 1 MASTER, 1 EMPRESA y 1 EMPLEADO relacionado a la empresa"
 
     def handle(self, *args, **kwargs):
+        # Configuración mediante variables de entorno con valores por defecto
+        master_username = os.getenv("SEED_MASTER_USERNAME", "master_user")
+        master_password = os.getenv("SEED_MASTER_PASSWORD", "master123")
+        master_email = os.getenv("SEED_MASTER_EMAIL", "master@example.com")
+
+        empresa_username = os.getenv("SEED_EMPRESA_USERNAME", "empresa_test")
+        empresa_password = os.getenv("SEED_EMPRESA_PASSWORD", "empresa123")
+        empresa_email = os.getenv("SEED_EMPRESA_EMAIL", "empresa@example.com")
+        empresa_nombre = os.getenv("SEED_EMPRESA_NAME", "Empresa de Prueba S.A.")
+        empresa_nif = os.getenv("SEED_EMPRESA_NIF", "B12345678")
+        empresa_address = os.getenv("SEED_EMPRESA_ADDRESS", "Calle Principal 123")
+        empresa_city = os.getenv("SEED_EMPRESA_CITY", "Madrid")
+        empresa_postal_code = os.getenv("SEED_EMPRESA_POSTAL_CODE", "28001")
+        empresa_contact_email = os.getenv("SEED_EMPRESA_CONTACT_EMAIL", "contacto@empresatest.com")
+        empresa_periodicity = os.getenv("SEED_EMPRESA_PERIODICITY", EmpresaProfile.PERIODICITY_TRIMESTRAL)
+
+        empleado_username = os.getenv("SEED_EMPLEADO_USERNAME", "empleado_test")
+        empleado_password = os.getenv("SEED_EMPLEADO_PASSWORD", "empleado123")
+        empleado_email = os.getenv("SEED_EMPLEADO_EMAIL", "empleado@example.com")
+        empleado_nombre = os.getenv("SEED_EMPLEADO_NOMBRE", "Juan")
+        empleado_apellido = os.getenv("SEED_EMPLEADO_APELLIDO", "Pérez")
+        empleado_dni = os.getenv("SEED_EMPLEADO_DNI", "12345678A")
+
         # Crear usuario MASTER
-        master_username = "master_user"
         if not CustomUser.objects.filter(username=master_username).exists():
-            master_user = CustomUser.objects.create_superuser(
+            CustomUser.objects.create_superuser(
                 username=master_username,
-                email="master@example.com",
-                password="master123",
+                email=master_email,
+                password=master_password,
                 first_name="Master",
                 last_name="Admin",
                 role="MASTER"
@@ -22,12 +46,11 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"⚠ El usuario MASTER '{master_username}' ya existe."))
 
         # Crear usuario EMPRESA
-        empresa_username = "empresa_test"
         if not CustomUser.objects.filter(username=empresa_username).exists():
             empresa_user = CustomUser.objects.create_user(
                 username=empresa_username,
-                email="empresa@example.com",
-                password="empresa123",
+                email=empresa_email,
+                password=empresa_password,
                 first_name="Empresa",
                 last_name="Test",
                 role="EMPRESA"
@@ -36,13 +59,14 @@ class Command(BaseCommand):
             # Crear perfil de empresa
             EmpresaProfile.objects.create(
                 user=empresa_user,
-                nombre_empresa="Empresa de Prueba S.A.",
-                nif="B12345678",
-                address="Calle Principal 123",
-                city="Madrid",
-                postal_code="28001",
-                correo_contacto="contacto@empresatest.com",
-                permisos=True
+                nombre_empresa=empresa_nombre,
+                nif=empresa_nif,
+                address=empresa_address,
+                city=empresa_city,
+                postal_code=empresa_postal_code,
+                correo_contacto=empresa_contact_email,
+                permisos=True,
+                periodicity=empresa_periodicity,
             )
 
             self.stdout.write(self.style.SUCCESS(f"✓ Usuario EMPRESA '{empresa_username}' y perfil creados exitosamente."))
@@ -51,14 +75,13 @@ class Command(BaseCommand):
             empresa_user = CustomUser.objects.get(username=empresa_username)
 
         # Crear usuario EMPLEADO
-        empleado_username = "empleado_test"
         if not CustomUser.objects.filter(username=empleado_username).exists():
             empleado_user = CustomUser.objects.create_user(
                 username=empleado_username,
-                email="empleado@example.com",
-                password="empleado123",
-                first_name="Juan",
-                last_name="Pérez",
+                email=empleado_email,
+                password=empleado_password,
+                first_name=empleado_nombre,
+                last_name=empleado_apellido,
                 role="EMPLEADO"
             )
 
@@ -70,9 +93,9 @@ class Command(BaseCommand):
                 EmpleadoProfile.objects.create(
                     user=empleado_user,
                     empresa=empresa_profile,
-                    nombre="Juan",
-                    apellido="Pérez",
-                    dni="12345678A"
+                    nombre=empleado_nombre,
+                    apellido=empleado_apellido,
+                    dni=empleado_dni
                 )
 
                 self.stdout.write(self.style.SUCCESS(
@@ -90,7 +113,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("\n" + "="*60))
         self.stdout.write(self.style.SUCCESS("RESUMEN DE USUARIOS CREADOS:"))
         self.stdout.write(self.style.SUCCESS("="*60))
-        self.stdout.write(f"MASTER   → username: {master_username}   | password: master123")
-        self.stdout.write(f"EMPRESA  → username: {empresa_username}  | password: empresa123")
-        self.stdout.write(f"EMPLEADO → username: {empleado_username} | password: empleado123")
+        self.stdout.write(f"MASTER   → username: {master_username}   | password: {master_password}")
+        self.stdout.write(f"EMPRESA  → username: {empresa_username}  | password: {empresa_password}")
+        self.stdout.write(f"EMPLEADO → username: {empleado_username} | password: {empleado_password}")
         self.stdout.write(self.style.SUCCESS("="*60))

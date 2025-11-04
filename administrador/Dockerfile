@@ -1,27 +1,38 @@
-# Usa una imagen de Python
-FROM python:3.10
+# Usa una imagen ligera de Python
+FROM python:3.10-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 # Configura el directorio de trabajo en el contenedor
 WORKDIR /app
 
-# Copia el archivo de requerimientos
-COPY requirements.txt requirements.txt
+# Paquetes del sistema necesarios para compilar dependencias como psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        bash \
+        build-essential \
+        libpq-dev \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instala dependencias
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+# Copia e instala dependencias
+COPY requirements.txt ./
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Copia todo el código (incluido el script de espera)
+# Copia el resto del código al contenedor
 COPY . .
 
-# Convierte terminadores de línea de Windows a Unix
-RUN sed -i 's/\r$//' /app/wait-for-it.sh
+# Normaliza finales de línea y permisos de scripts
+RUN sed -i 's/\r$//' /app/wait-for-it.sh /app/entrypoint.sh \
+    && chmod +x /app/wait-for-it.sh /app/entrypoint.sh
 
-# Da permisos de ejecución al script
-RUN chmod +x /app/wait-for-it.sh
+ENV DJANGO_ENV=production \
+    PORT=8000
 
 # Expone el puerto 8000
 EXPOSE 8000
 
-# Usa wait-for-it para esperar que el contenedor de PostgreSQL esté listo
-CMD ["sh", "-c", "./wait-for-it.sh db python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+# Punto de entrada
+ENTRYPOINT ["./entrypoint.sh"]

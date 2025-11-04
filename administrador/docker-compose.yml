@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: crowe7p
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: ${DB_NAME:-crowe7p}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
@@ -17,17 +17,16 @@ services:
     volumes:
       - .:/app
     environment:
-      - DEBUG=True
-      - DB_NAME=crowe7p
-      - DB_USER=postgres
-      - DB_PASSWORD=1234
-      - DB_HOST=db
-      - DB_PORT=5432
+      DJANGO_ENV: ${DJANGO_ENV:-development}
+      DEBUG: ${DEBUG:-True}
+      DB_NAME: ${DB_NAME:-crowe7p}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      SEED_INITIAL_USERS: ${SEED_INITIAL_USERS:-false}
     depends_on:
       - db
-    command: sh -c "python manage.py migrate &&
-      python manage.py create_master_user &&
-      python manage.py runserver 127.0.0.1:9000"
 
 volumes:
   postgres_data:

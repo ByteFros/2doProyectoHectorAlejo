@@ -24,13 +24,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+# Environment helpers
+def get_bool(value, default=False):
+    if value is None:
+        return default
+    return value.lower() in ("true", "1", "yes", "on")
+
+
+DJANGO_ENV = os.getenv("DJANGO_ENV", "development")
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-e$(-3@+$oz#j@j2at*ce32q=iav#lm%27_$z-uj5y@8rtz@*vp'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DJANGO_ENV == "production":
+        raise ValueError("DJANGO_SECRET_KEY must be set in production environments")
+    SECRET_KEY = 'django-insecure-e$(-3@+$oz#j@j2at*ce32q=iav#lm%27_$z-uj5y@8rtz@*vp'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+default_debug = "True" if DJANGO_ENV != "production" else "False"
+DEBUG = get_bool(os.getenv("DEBUG", default_debug))
 
-ALLOWED_HOSTS = ['*']
+raw_allowed_hosts = os.getenv("DJANGO_ALLOWED_HOSTS", "*")
+ALLOWED_HOSTS = [host.strip() for host in raw_allowed_hosts.split(",") if host.strip()]
 
 
 # Application definition
@@ -100,7 +115,7 @@ WSGI_APPLICATION = 'administrador.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Database configuration based on environment
-if os.getenv('DJANGO_ENV') == 'production':
+if DJANGO_ENV == 'production':
     # PostgreSQL for production
     DATABASES = {
         'default': {
@@ -161,7 +176,12 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # 🔹 Aquí se almacenarán los archivos subidos
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+static_dir = os.path.join(BASE_DIR, "static")
+if DJANGO_ENV == 'production':
+    STATICFILES_DIRS = []
+else:
+    STATICFILES_DIRS = [static_dir] if os.path.isdir(static_dir) else []
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -171,18 +191,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.CustomUser'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:8000", 
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:8000",
-    "http://crowe_frontend:5173",     # Nombre del servicio en Docker
-    "http://crowe_backend:8000",     # Nombre del servicio en Docker
-    "http://10.10.0.197:5173",
-]
+raw_cors_origins = os.getenv("CORS_ALLOWED_ORIGINS")
+if raw_cors_origins:
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in raw_cors_origins.split(",")
+        if origin.strip()
+    ]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://localhost:8000", 
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://crowe_frontend:5173",     # Nombre del servicio en Docker
+        "http://crowe_backend:8000",     # Nombre del servicio en Docker
+        "http://10.10.0.197:5173",
+    ]
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Usar solo en desarrollo
+CORS_ALLOW_CREDENTIALS = get_bool(os.getenv("CORS_ALLOW_CREDENTIALS"), True)
+CORS_ALLOW_ALL_ORIGINS = get_bool(os.getenv("CORS_ALLOW_ALL_ORIGINS"), False)  # Usar solo en desarrollo
 
 # Headers permitidos para CORS
 CORS_ALLOW_HEADERS = [
@@ -208,14 +236,22 @@ CORS_ALLOW_METHODS = [
 ]
 
 # CSRF Configuration (deshabilitado para API)
-CSRF_COOKIE_SECURE = False  # Solo HTTPS en producción
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+CSRF_COOKIE_SECURE = get_bool(os.getenv("CSRF_COOKIE_SECURE"), DJANGO_ENV == "production")
+raw_csrf_origins = os.getenv("CSRF_TRUSTED_ORIGINS")
+if raw_csrf_origins:
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip()
+        for origin in raw_csrf_origins.split(",")
+        if origin.strip()
+    ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
 # Session Configuration
-SESSION_COOKIE_SECURE = False  # Solo HTTPS en producción
+SESSION_COOKIE_SECURE = get_bool(os.getenv("SESSION_COOKIE_SECURE"), DJANGO_ENV == "production")
 SESSION_COOKIE_SAMESITE = 'Lax'  # Cambiado de None a Lax
 CSRF_COOKIE_SAMESITE = 'Lax'     # Cambiado de None a Lax
 
