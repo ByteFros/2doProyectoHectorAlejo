@@ -362,7 +362,11 @@ class TripsPerMonthView(APIView):
         viajes_agrupados = (
             viajes.annotate(month=TruncMonth('fecha_inicio'))
             .values('month')
-            .annotate(totalTrips=Count('pk'))
+            .annotate(
+                totalTrips=Count('pk'),
+                pendingTrips=Count('pk', filter=Q(estado__in=['EN_REVISION', 'REABIERTO'])),
+                reviewedTrips=Count('pk', filter=Q(estado='REVISADO'))
+            )
             .order_by('month')
         )
 
@@ -378,10 +382,14 @@ class TripsPerMonthView(APIView):
             )
 
         # Serialización de los datos
-        data = [
-            {'month': v['month'].strftime('%Y-%m'), 'totalTrips': v['totalTrips']}
-            for v in viajes_agrupados
-        ]
+        data = []
+        for v in viajes_agrupados:
+            data.append({
+                'month': v['month'].strftime('%Y-%m'),
+                'totalTrips': v['totalTrips'],
+                'pendingTrips': v['pendingTrips'],
+                'reviewedTrips': v['reviewedTrips'],
+            })
 
         return Response({
             "year": year_param if year_param else "todos",

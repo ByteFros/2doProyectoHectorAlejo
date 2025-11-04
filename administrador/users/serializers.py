@@ -622,8 +622,10 @@ class CompanyTripsSummarySerializer(serializers.Serializer):
 
 
 class TripsPerMonthSerializer(serializers.Serializer):
-    month = serializers.CharField()     # ej. '2025-03'
+    month = serializers.CharField()          # ej. '2025-03'
     totalTrips = serializers.IntegerField()  # Número de viajes iniciados en el mes
+    pendingTrips = serializers.IntegerField()   # Viajes pendientes de revisión en el mes
+    reviewedTrips = serializers.IntegerField()  # Viajes revisados en el mes
 
 class TripsTypeSerializer(serializers.Serializer):
     national = serializers.IntegerField()
