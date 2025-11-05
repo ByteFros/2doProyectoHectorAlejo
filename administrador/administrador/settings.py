@@ -207,6 +207,7 @@ else:
         "http://crowe_frontend:5173",     # Nombre del servicio en Docker
         "http://crowe_backend:8000",     # Nombre del servicio en Docker
         "http://10.10.0.197:5173",
+        "http://172.31.160.1:3000",
     ]
 
 CORS_ALLOW_CREDENTIALS = get_bool(os.getenv("CORS_ALLOW_CREDENTIALS"), True)
