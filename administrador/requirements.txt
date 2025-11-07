@@ -20,7 +20,7 @@ hyperlink==21.0.0
 idna==3.10
 incremental==24.7.2
 msgpack==1.1.0
-numpy==2.3.3
+numpy==2.2.6
 packaging==25.0
 psycopg2-binary==2.9.10
 pyasn1==0.6.1
@@ -43,3 +43,4 @@ tzdata==2025.1
 whitenoise==6.6.0
 xlrd==2.0.1
 zope.interface==7.2
+gunicorn==21.2.0

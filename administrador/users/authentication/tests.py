@@ -222,6 +222,72 @@ class AuthenticationTestCase(TestCase):
 
         self.authenticate()
 
+    def test_register_empresa_without_password_uses_default(self):
+        self.authenticate(self.master_access)
+        url = reverse('register')
+        data = {
+            'username': 'empresa_sin_pass',
+            'email': 'sinpass@empresa.com',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Sin Pass',
+            'nif': 'B55555555',
+            'address': 'Calle 1',
+            'city': 'Madrid',
+            'postal_code': '28001',
+            'correo_contacto': 'sinpass@empresa.com'
+        }
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = CustomUser.objects.get(username='empresa_sin_pass')
+        self.assertTrue(user.must_change_password)
+        self.assertTrue(user.check_password('empresa'))
+
+        login_resp = self.client.post(reverse('login'), {
+            'username': 'empresa_sin_pass',
+            'password': 'empresa'
+        })
+        self.assertEqual(login_resp.status_code, status.HTTP_200_OK)
+        self.authenticate()
+
+    def test_register_empresa_autofills_username_and_contact_email(self):
+        self.authenticate(self.master_access)
+        url = reverse('register')
+        data = {
+            'email': 'autofill@empresa.com',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Autofill',
+            'nif': 'B66666666'
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user = CustomUser.objects.get(email='autofill@empresa.com')
+        self.assertEqual(user.username, 'autofill@empresa.com')
+        empresa = user.empresa_profile
+        self.assertEqual(empresa.correo_contacto, 'autofill@empresa.com')
+
+    def test_register_empresa_rejects_duplicate_nif(self):
+        self.authenticate(self.master_access)
+        url = reverse('register')
+        base_payload = {
+            'email': 'primera@empresa.com',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Uno',
+            'nif': 'B00000001'
+        }
+        self.client.post(url, base_payload)
+
+        payload = {
+            'email': 'segunda@empresa.com',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Dos',
+            'nif': 'b-00000001'
+        }
+        response = self.client.post(url, payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('nif', response.data)
+
     def test_register_user_empresa_with_autogestion_permissions(self):
         """Test: Registro de empresa con permisos de autogestión"""
         self.authenticate(self.master_access)

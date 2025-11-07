@@ -2,6 +2,7 @@
 Serializers para el módulo de autenticación
 """
 from django.db import transaction
+import re
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -81,19 +82,27 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             salario = None
 
         password = validated_data.pop('password', None)
-        if not password:
-            if role == 'EMPLEADO':
-                password = 'empleado'
-            elif role == 'EMPRESA':
-                password = 'empresa'
-            else:
-                raise serializers.ValidationError({"password": "Debe proporcionar una contraseña."})
+        must_change = False
+        if role == 'EMPLEADO':
+            password = password or 'empleado'
+            must_change = True
+        elif role == 'EMPRESA':
+            password = password or 'empresa'
+            must_change = True
+        elif not password:
+            raise serializers.ValidationError({"password": "Debe proporcionar una contraseña."})
+
+        username = validated_data.get('username') or validated_data['email']
+        correo_contacto = validated_data.get('correo_contacto') or validated_data['email']
+        if role == 'EMPRESA' and validated_data.get('nif'):
+            validated_data['nif'] = re.sub(r'[^0-9A-Za-z]', '', validated_data['nif']).upper()
 
         with transaction.atomic():
             user = CustomUser.objects.create(
-                username=validated_data['username'],
+                username=username,
                 email=validated_data['email'],
-                role=role
+                role=role,
+                must_change_password=must_change
             )
             user.set_password(password)
             user.save()
@@ -106,7 +115,7 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                     address=validated_data.get('address', ''),
                     city=validated_data.get('city', ''),
                     postal_code=validated_data.get('postal_code', ''),
-                    correo_contacto=validated_data['correo_contacto'],
+                    correo_contacto=correo_contacto,
                     permisos=permisos
                 )
             elif role == 'EMPLEADO':

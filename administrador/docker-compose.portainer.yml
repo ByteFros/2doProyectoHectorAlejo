@@ -20,7 +20,7 @@ services:
       retries: 5
 
   backend:
-    image: crowe-backend:1.0.3
+    image: crowe-backend:1.0.6
     container_name: crowe-backend
     environment:
       DJANGO_ENV: ${DJANGO_ENV:-production}
@@ -36,6 +36,12 @@ services:
       DB_PORT: ${DB_PORT:-5432}
       RUN_COLLECTSTATIC: ${RUN_COLLECTSTATIC:-true}
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      JWT_ACCESS_TTL_MINUTES: ${JWT_ACCESS_TTL_MINUTES:-15}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-7}
+      JWT_ROTATE_REFRESH_TOKENS: ${JWT_ROTATE_REFRESH_TOKENS:-True}
+      JWT_BLACKLIST_AFTER_ROTATION: ${JWT_BLACKLIST_AFTER_ROTATION:-True}
       SEED_INITIAL_USERS: ${SEED_INITIAL_USERS:-true}
       EXTRA_MANAGEMENT_COMMANDS: ${EXTRA_MANAGEMENT_COMMANDS}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
@@ -76,7 +82,7 @@ services:
     restart: always
 
   frontend:
-    image: crowe-frontend:1.0.3
+    image: crowe-frontend:1.0.8
     container_name: crowe-frontend
     environment:
       NODE_ENV: ${NODE_ENV:-production}
