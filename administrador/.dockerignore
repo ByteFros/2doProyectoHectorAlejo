@@ -2,3 +2,10 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+.venv/
+venv/
+env/
+node_modules/
+db.sqlite3
+media/
+staticfiles/

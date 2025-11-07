@@ -201,7 +201,7 @@ if raw_cors_origins:
 else:
     CORS_ALLOWED_ORIGINS = [
         "http://localhost:5173",
-        "http://localhost:8000", 
+        "http://localhost:3000", 
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8000",
         "http://crowe_frontend:5173",     # Nombre del servicio en Docker
@@ -235,6 +235,11 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+# Seguridad detrás de proxy (Caddy / reverse proxy)
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = get_bool(os.getenv("SECURE_SSL_REDIRECT"), DJANGO_ENV == "production")
 
 # CSRF Configuration (deshabilitado para API)
 CSRF_COOKIE_SECURE = get_bool(os.getenv("CSRF_COOKIE_SECURE"), DJANGO_ENV == "production")

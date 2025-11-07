@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:15
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${DB_NAME:-crowe7p}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -16,10 +18,11 @@ services:
       retries: 5
 
   web:
-    build:
-      context: .
+    image: crowe-backend:1.0.3
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       DJANGO_ENV: production
       DEBUG: "False"
@@ -42,6 +45,20 @@ services:
         condition: service_healthy
     volumes:
       - staticfiles:/app/staticfiles
+    restart: always
+
+  frontend:
+    image: crowe-frontend:1.0.3
+    ports:
+      - "3000:8000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: ${FRONTEND_PORT:-8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+    depends_on:
+      - web
     restart: always
 
 volumes:

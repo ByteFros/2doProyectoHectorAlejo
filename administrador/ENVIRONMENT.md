@@ -36,6 +36,10 @@ Este documento resume las variables de entorno soportadas por el backend y cómo
 - `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`: Credenciales del servicio de correo.
 - `DEFAULT_FROM_EMAIL`: Dirección remitente predeterminada para los envíos.
 
+## Frontend (cuando se despliega con Docker)
+
+- `VITE_API_BASE_URL`: URL base usada por el frontend para llamar al backend. Debe apuntar al nombre del servicio dentro de la red (`http://web:8000/api` en Compose) o al dominio público en producción.
+
 ## Datos de seed (usuarios por rol)
 
 Se usan cuando `SEED_INITIAL_USERS=true`. Todos tienen valores predeterminados pero pueden sobreescribirse:
@@ -44,6 +48,11 @@ Se usan cuando `SEED_INITIAL_USERS=true`. Todos tienen valores predeterminados p
 - `SEED_EMPRESA_USERNAME`, `SEED_EMPRESA_PASSWORD`, `SEED_EMPRESA_EMAIL`
 - `SEED_EMPRESA_NAME`, `SEED_EMPRESA_NIF`, `SEED_EMPRESA_ADDRESS`, `SEED_EMPRESA_CITY`, `SEED_EMPRESA_POSTAL_CODE`, `SEED_EMPRESA_CONTACT_EMAIL`, `SEED_EMPRESA_PERIODICITY`
 - `SEED_EMPLEADO_USERNAME`, `SEED_EMPLEADO_PASSWORD`, `SEED_EMPLEADO_EMAIL`, `SEED_EMPLEADO_NOMBRE`, `SEED_EMPLEADO_APELLIDO`, `SEED_EMPLEADO_DNI`
+
+## Comandos de gestión adicionales
+
+- `EXTRA_MANAGEMENT_COMMANDS`: lista de comandos de `manage.py` a ejecutar tras el seeding, separados por salto de línea o `;`. Ejemplos:  
+  `EXTRA_MANAGEMENT_COMMANDS=load_sample_data --clear;create_sample_trips --clear;create_sample_expenses`
 
 ## Uso con Docker Compose
 

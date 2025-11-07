@@ -1,0 +1,34 @@
+{
+    email {$ACME_EMAIL}
+}
+
+{$CADDY_DOMAIN} {
+    encode gzip zstd
+
+    handle_path /static/* {
+        root * /srv/static
+        file_server
+    }
+
+    handle_path /media/* {
+        root * /srv/media
+        file_server
+    }
+
+    @backend_path {
+        path /api/* /docs/* /openapi.json
+    }
+    handle @backend_path {
+        reverse_proxy {$BACKEND_UPSTREAM}
+    }
+
+    @django_admin path /django-admin*
+    handle @django_admin {
+        uri replace /django-admin /admin
+        reverse_proxy {$BACKEND_UPSTREAM}
+    }
+
+    handle {
+        reverse_proxy {$FRONTEND_UPSTREAM}
+    }
+}

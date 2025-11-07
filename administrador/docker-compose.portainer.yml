@@ -1,0 +1,123 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: crowe-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-crowe7p}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - crowe-net
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-crowe7p}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: crowe-backend:1.0.3
+    container_name: crowe-backend
+    environment:
+      DJANGO_ENV: ${DJANGO_ENV:-production}
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-crowe.bronixia.es}
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://crowe.bronixia.es}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://crowe.bronixia.es}
+      DB_NAME: ${DB_NAME:-crowe7p}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      RUN_COLLECTSTATIC: ${RUN_COLLECTSTATIC:-true}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      SEED_INITIAL_USERS: ${SEED_INITIAL_USERS:-true}
+      EXTRA_MANAGEMENT_COMMANDS: ${EXTRA_MANAGEMENT_COMMANDS}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL}
+      SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-True}
+      SEED_MASTER_USERNAME: ${SEED_MASTER_USERNAME}
+      SEED_MASTER_PASSWORD: ${SEED_MASTER_PASSWORD}
+      SEED_MASTER_EMAIL: ${SEED_MASTER_EMAIL}
+      SEED_EMPRESA_USERNAME: ${SEED_EMPRESA_USERNAME}
+      SEED_EMPRESA_PASSWORD: ${SEED_EMPRESA_PASSWORD}
+      SEED_EMPRESA_EMAIL: ${SEED_EMPRESA_EMAIL}
+      SEED_EMPRESA_NAME: ${SEED_EMPRESA_NAME}
+      SEED_EMPRESA_NIF: ${SEED_EMPRESA_NIF}
+      SEED_EMPRESA_ADDRESS: ${SEED_EMPRESA_ADDRESS}
+      SEED_EMPRESA_CITY: ${SEED_EMPRESA_CITY}
+      SEED_EMPRESA_POSTAL_CODE: ${SEED_EMPRESA_POSTAL_CODE}
+      SEED_EMPRESA_CONTACT_EMAIL: ${SEED_EMPRESA_CONTACT_EMAIL}
+      SEED_EMPRESA_PERIODICITY: ${SEED_EMPRESA_PERIODICITY}
+      SEED_EMPLEADO_USERNAME: ${SEED_EMPLEADO_USERNAME}
+      SEED_EMPLEADO_PASSWORD: ${SEED_EMPLEADO_PASSWORD}
+      SEED_EMPLEADO_EMAIL: ${SEED_EMPLEADO_EMAIL}
+      SEED_EMPLEADO_NOMBRE: ${SEED_EMPLEADO_NOMBRE}
+      SEED_EMPLEADO_APELLIDO: ${SEED_EMPLEADO_APELLIDO}
+      SEED_EMPLEADO_DNI: ${SEED_EMPLEADO_DNI}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - staticfiles:/app/staticfiles
+      - mediafiles:/app/media
+    networks:
+      - crowe-net
+    restart: always
+
+  frontend:
+    image: crowe-frontend:1.0.3
+    container_name: crowe-frontend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://crowe.bronixia.es/api}
+    networks:
+      - crowe-net
+    restart: always
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: crowe-caddy
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-admin@crowe.bronixia.es}
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-crowe.bronixia.es}
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:-backend:8000}
+      FRONTEND_UPSTREAM: ${FRONTEND_UPSTREAM:-frontend:8000}
+    volumes:
+      - /opt/crowe/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - staticfiles:/srv/static:ro
+      - mediafiles:/srv/media:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - crowe-net
+    restart: always
+
+
+networks:
+  crowe-net:
+    name: crowe-net
+
+volumes:
+  postgres_data:
+  staticfiles:
+  mediafiles:
+  caddy_data:
+  caddy_config:
