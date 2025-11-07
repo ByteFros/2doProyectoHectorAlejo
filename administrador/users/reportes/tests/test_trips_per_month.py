@@ -3,7 +3,7 @@ from datetime import date
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.test import APIClient
 
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje
@@ -19,7 +19,7 @@ class TripsPerMonthReportTests(TestCase):
             password='pass',
             role='MASTER'
         )
-        self.master_token = Token.objects.create(user=self.master).key
+        self.master_token = str(RefreshToken.for_user(self.master).access_token)
 
         empresa_user = CustomUser.objects.create_user(
             username='empresa',
@@ -88,7 +88,7 @@ class TripsPerMonthReportTests(TestCase):
 
     def authenticate(self, token=None):
         if token:
-            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         else:
             self.client.credentials()
 

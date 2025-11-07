@@ -4,7 +4,7 @@ Vistas para gestión de gastos
 from django.shortcuts import get_object_or_404
 from django.http import FileResponse, Http404
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
@@ -39,7 +39,7 @@ from .services import (
 
 class CrearGastoView(APIView):
     """Permite a un empleado registrar un gasto en un viaje"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
@@ -79,7 +79,7 @@ class CrearGastoView(APIView):
 
 class AprobarRechazarGastoView(APIView):
     """Permite a una EMPRESA o MASTER aprobar o rechazar gastos"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def put(self, request, gasto_id):
@@ -104,7 +104,7 @@ class AprobarRechazarGastoView(APIView):
 
 class GastoListView(APIView):
     """Vista para listar los gastos con detalles de los viajes"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -149,7 +149,7 @@ class GastoListView(APIView):
 
 class GastoUpdateDeleteView(APIView):
     """Permite a un empleado actualizar o eliminar sus propios gastos"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
 
@@ -159,15 +159,6 @@ class GastoUpdateDeleteView(APIView):
         # Verificar permisos
         if not puede_modificar_gasto(request.user, gasto):
             raise UnauthorizedAccessError("No puedes modificar este gasto")
-
-        if gasto.viaje and gasto.viaje.estado == "REABIERTO":
-            incoming_fields = set(request.data.keys())
-            allowed_fields = {'comprobante', 'viaje_id', 'empresa_id', 'empleado_id'}
-            if incoming_fields - allowed_fields:
-                return Response(
-                    {"error": "Solo se permite adjuntar documentación en viajes reabiertos."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
         serializer = GastoSerializer(gasto, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
@@ -201,7 +192,7 @@ class GastoUpdateDeleteView(APIView):
 
 class GastoComprobanteDownloadView(APIView):
     """Permite descargar el comprobante de un gasto"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, gasto_id):

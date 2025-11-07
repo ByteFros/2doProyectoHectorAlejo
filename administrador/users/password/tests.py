@@ -145,11 +145,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'testuser',
             'password': 'oldpassword123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Cambiar contraseña
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {
             'old_password': 'oldpassword123',
             'new_password': 'newpassword123',
@@ -174,11 +174,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'testuser',
             'password': 'oldpassword123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Intentar cambiar con contraseña incorrecta
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {
             'old_password': 'wrongpassword',
             'new_password': 'newpassword123',
@@ -197,11 +197,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'testuser',
             'password': 'oldpassword123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Intentar cambiar a la misma contraseña
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {
             'old_password': 'oldpassword123',
             'new_password': 'oldpassword123',
@@ -221,11 +221,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'master',
             'password': 'masterpass123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Intentar cambiar contraseña
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {
             'old_password': 'masterpass123',
             'new_password': 'newmasterpass123',
@@ -261,11 +261,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'testuser',
             'password': 'oldpassword123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Intentar cambiar con contraseña corta
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {
             'old_password': 'oldpassword123',
             'new_password': 'short',  # Menos de 8 caracteres
@@ -283,11 +283,11 @@ class PasswordManagementTestCase(TestCase):
             'username': 'testuser',
             'password': 'oldpassword123'
         })
-        token = login_response.data['token']
+        token = login_response.data['access']
 
         # Intentar cambiar sin campos
         url = reverse('change_password')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         data = {}
         response = self.client.put(url, data)
 

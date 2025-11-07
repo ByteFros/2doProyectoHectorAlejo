@@ -5,7 +5,7 @@ Prueba la funcionalidad de carga anidada (nested loading) de datos relacionados.
 from datetime import date, timedelta
 from django.test import TestCase
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.test import APIClient
 
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje
@@ -28,7 +28,7 @@ class IncludeParameterTestCase(TestCase):
             password="password123",
             role="MASTER"
         )
-        self.master_token = Token.objects.create(user=self.master_user)
+        self.master_token = self._token(self.master_user)
 
         # Crear empresa con usuario EMPRESA
         self.empresa_user = CustomUser.objects.create_user(
@@ -37,7 +37,7 @@ class IncludeParameterTestCase(TestCase):
             password="password123",
             role="EMPRESA"
         )
-        self.empresa_token = Token.objects.create(user=self.empresa_user)
+        self.empresa_token = self._token(self.empresa_user)
         self.empresa = EmpresaProfile.objects.create(
             user=self.empresa_user,
             nombre_empresa="Empresa Test",
@@ -121,13 +121,16 @@ class IncludeParameterTestCase(TestCase):
             motivo="Conferencia internacional"
         )
 
+    def _token(self, user):
+        return str(RefreshToken.for_user(user).access_token)
+
 
 class EmpresaIncludeEmpleadosTest(IncludeParameterTestCase):
     """Tests para GET /empresas/?include=empleados"""
 
     def test_empresas_sin_include(self):
         """GET /empresas/ sin include - NO debe traer empleados anidados"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empresas/')
 
@@ -142,7 +145,7 @@ class EmpresaIncludeEmpleadosTest(IncludeParameterTestCase):
 
     def test_empresas_con_include_empleados(self):
         """GET /empresas/?include=empleados - DEBE traer empleados anidados"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empresas/?include=empleados')
 
@@ -172,7 +175,7 @@ class EmpresaIncludeEmpleadosTest(IncludeParameterTestCase):
 
     def test_empresa_detalle_con_include_empleados(self):
         """GET /empresas/{id}/?include=empleados - Detalle con empleados"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(
             f'{API_BASE_URL}/empresas/{self.empresa.id}/?include=empleados'
@@ -191,7 +194,7 @@ class EmpresaIncludeEmpleadosTest(IncludeParameterTestCase):
 
     def test_empresa_sin_permisos_include_empleados(self):
         """EMPRESA no puede listar todas las empresas (ni con include)"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.empresa_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.empresa_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empresas/?include=empleados')
 
@@ -204,7 +207,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
 
     def test_empleados_sin_include(self):
         """GET /empleados/ sin include - NO debe traer viajes anidados"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empleados/')
 
@@ -220,7 +223,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
 
     def test_empleados_con_include_viajes(self):
         """GET /empleados/?include=viajes - DEBE traer viajes anidados"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empleados/?include=viajes')
 
@@ -258,7 +261,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
 
     def test_empleado_detalle_con_include_viajes(self):
         """GET /empleados/{id}/?include=viajes - Detalle con viajes"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(
             f'{API_BASE_URL}/empleados/{self.empleado1.id}/?include=viajes'
@@ -298,7 +301,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
             dni="11111111C"
         )
 
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(
             f'{API_BASE_URL}/empleados/{empleado_sin_viajes.id}/?include=viajes'
@@ -312,7 +315,7 @@ class EmpleadoIncludeViajesTest(IncludeParameterTestCase):
 
     def test_empresa_ve_solo_sus_empleados_con_viajes(self):
         """EMPRESA solo ve empleados de su empresa con include=viajes"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.empresa_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.empresa_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empleados/?include=viajes')
 
@@ -330,7 +333,7 @@ class IncludeParameterEdgeCasesTest(IncludeParameterTestCase):
 
     def test_include_invalido_ignorado(self):
         """Include con valor inválido debe ignorarse y devolver datos básicos"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empresas/?include=invalid')
 
@@ -341,7 +344,7 @@ class IncludeParameterEdgeCasesTest(IncludeParameterTestCase):
 
     def test_include_vacio_igual_sin_include(self):
         """include= (vacío) debe comportarse igual que sin include"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response_sin_include = self.client.get(f'{API_BASE_URL}/empresas/')
         response_con_vacio = self.client.get(f'{API_BASE_URL}/empresas/?include=')
@@ -359,7 +362,7 @@ class IncludeParameterEdgeCasesTest(IncludeParameterTestCase):
     def test_multiple_includes_no_soportados(self):
         """include con múltiples valores separados por coma (futuro)"""
         # Por ahora, solo verificamos que no causa error
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(f'{API_BASE_URL}/empresas/?include=empleados,otro')
 
@@ -370,7 +373,7 @@ class IncludeParameterEdgeCasesTest(IncludeParameterTestCase):
 
     def test_filtro_empresa_con_include_viajes(self):
         """Combinar filtros con include debe funcionar correctamente"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(
             f'{API_BASE_URL}/empleados/?empresa={self.empresa.id}&include=viajes'
@@ -386,7 +389,7 @@ class IncludeParameterEdgeCasesTest(IncludeParameterTestCase):
 
     def test_search_con_include(self):
         """Buscar empleados con include=viajes debe funcionar"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         response = self.client.get(
             f'{API_BASE_URL}/empleados/?search=Juan&include=viajes'
@@ -407,7 +410,7 @@ class IncludeParameterPerformanceTest(IncludeParameterTestCase):
 
     def test_numero_queries_sin_include(self):
         """Verificar que sin include no se hacen queries extras"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         # Django's assertNumQueries context manager
         from django.test.utils import override_settings
@@ -425,7 +428,7 @@ class IncludeParameterPerformanceTest(IncludeParameterTestCase):
 
     def test_numero_queries_con_include(self):
         """Verificar que include usa prefetch_related correctamente"""
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.master_token.key}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         from django.db import connection
         from django.conf import settings

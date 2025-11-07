@@ -7,7 +7,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce, TruncMonth
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -52,7 +52,7 @@ class CompanyTripsSummaryView(APIView):
           Objetivo: Reducir a 2 queries totales usando Prefetch con anotaciones
           Beneficio: Significativo cuando hay 50+ empresas con empleados
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -323,7 +323,7 @@ class TripsPerMonthView(APIView):
     Query Parameters:
     - ?year=2024 : Filtra viajes por año específico (ej: 2024, 2025)
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -403,7 +403,7 @@ class TripsPerMonthView(APIView):
 
 class TripsTypeView(APIView):
     """Devuelve el conteo de viajes nacionales vs internacionales, filtrado por rol"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -446,7 +446,7 @@ class TripsTypeView(APIView):
 
 class ExemptDaysView(APIView):
     """Devuelve conteo de días exentos vs no exentos (viajes REVISADOS), filtrado por rol"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -489,7 +489,7 @@ class ExemptDaysView(APIView):
 class GeneralInfoView(APIView):
     """Devuelve totales de empresas, empleados y viajes nacionales/internacionales,
        filtrados según el rol del usuario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -551,7 +551,7 @@ class EmployeeTripsSummaryView(APIView):
     - EMPRESA: mantiene el listado de empleados con métricas agregadas.
     - EMPLEADO: devuelve resumen personal (viajes revisados, en revisión y días exentos/no exentos).
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -655,7 +655,7 @@ class EmployeeTripsSummaryView(APIView):
 
 class MasterCompanyEmployeesView(APIView):
     """Permite a un usuario MASTER ver los viajes de empleados de una empresa específica (ambos estados (EN_REVISION y REVISADO))"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empresa_id):

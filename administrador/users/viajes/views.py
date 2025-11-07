@@ -1,10 +1,11 @@
 """
 Vistas para gestión de viajes
 """
+from django.db import transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -41,9 +42,22 @@ from .services import (
 )
 
 
+def _ensure_can_review_viaje(user, viaje, empresa_cache=None):
+    if user.role == 'EMPRESA':
+        empresa = empresa_cache or get_object_or_404(EmpresaProfile, user=user)
+        if viaje.empresa_id != empresa.id:
+            raise UnauthorizedAccessError("No autorizado")
+        return empresa
+    if user.role == 'EMPLEADO':
+        raise UnauthorizedAccessError("Empleados no pueden validar días")
+    if user.role != 'MASTER':
+        raise UnauthorizedAccessError("No autorizado")
+    return None
+
+
 class CrearViajeView(APIView):
     """Permite a los empleados crear un nuevo viaje"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -96,7 +110,7 @@ class CrearViajeView(APIView):
 
 class ListarViajesRevisadosView(APIView):
     """Lista los viajes revisados según el rol del usuario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -166,7 +180,7 @@ class PendingTripsByEmployeeView(APIView):
     EMPRESA sólo los de su empresa;
     EMPLEADO ve sólo sus propios viajes.
     """
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empresa_id, empleado_id):
@@ -196,7 +210,7 @@ class PendingTripsByEmployeeView(APIView):
 
 class ListarTodosLosViajesView(APIView):
     """Lista todos los viajes según el rol del usuario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -287,7 +301,7 @@ class ListarTodosLosViajesView(APIView):
 
 class PendingTripsDetailView(APIView):
     """Devuelve count + lista de viajes 'EN_REVISION' o 'REABIERTO', opcionalmente filtrado por empleado"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -341,7 +355,7 @@ class PendingTripsDetailView(APIView):
 
 class ViajeDetailView(APIView):
     """Permite eliminar un viaje según el rol del usuario."""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, viaje_id):
@@ -380,7 +394,7 @@ class ViajeDetailView(APIView):
 
 class CambiarEstadoViajeView(APIView):
     """Permite a MASTER o EMPRESA cambiar el estado de un viaje (revisar o reabrir)"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, viaje_id):
@@ -420,7 +434,7 @@ class CambiarEstadoViajeView(APIView):
 
 class EmployeeCityStatsView(APIView):
     """Devuelve estadísticas de ciudades visitadas por un empleado (viajes revisados)"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -437,7 +451,7 @@ class EmployeeCityStatsView(APIView):
 
 class DiaViajeListView(APIView):
     """Lista los días de un viaje para revisión"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, viaje_id):
@@ -462,7 +476,7 @@ class DiaViajeListView(APIView):
 
 class DiaViajeReviewView(APIView):
     """Permite aprobar o marcar gasto no exento para un día de viaje"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def put(self, request, dia_id):
@@ -476,15 +490,10 @@ class DiaViajeReviewView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Permisos según rol
-        if user.role == 'EMPRESA':
-            empresa = get_object_or_404(EmpresaProfile, user=user)
-            if viaje.empresa != empresa:
-                return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
-        elif user.role == 'EMPLEADO':
-            return Response({'error': 'Empleados no pueden validar días'}, status=status.HTTP_403_FORBIDDEN)
-        elif user.role != 'MASTER':
-            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            _ensure_can_review_viaje(user, viaje)
+        except UnauthorizedAccessError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
 
         exento = request.data.get('exento')
         if not isinstance(exento, bool):
@@ -498,3 +507,60 @@ class DiaViajeReviewView(APIView):
         dia.gastos.update(estado=nuevo_estado)
 
         return Response({'message': 'Día validado correctamente.'}, status=status.HTTP_200_OK)
+
+
+class DiaViajeBatchReviewView(APIView):
+    """Permite validar múltiples días de viaje en una sola petición."""
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        dia_ids = request.data.get('dia_ids')
+        exento = request.data.get('exento')
+
+        if not isinstance(dia_ids, list) or not dia_ids:
+            return Response({'error': 'dia_ids debe ser una lista con al menos un elemento'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            dia_ids = [int(d) for d in dia_ids]
+        except (TypeError, ValueError):
+            return Response({'error': 'Todos los valores en dia_ids deben ser enteros'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(exento, bool):
+            return Response({'error': 'Campo "exento" inválido. Debe ser true o false.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        dias_qs = DiaViaje.objects.filter(id__in=dia_ids).select_related('viaje__empresa')
+        dias = list(dias_qs)
+        expected = len(set(dia_ids))
+        if len(dias) != expected:
+            existentes = {dia.id for dia in dias}
+            faltantes = [str(_id) for _id in dia_ids if _id not in existentes]
+            return Response({'error': f"No se encontraron los siguientes días: {', '.join(faltantes)}"}, status=status.HTTP_404_NOT_FOUND)
+
+        empresa_cache = None
+        try:
+            if request.user.role == 'EMPRESA':
+                empresa_cache = get_object_or_404(EmpresaProfile, user=request.user)
+                for dia in dias:
+                    _ensure_can_review_viaje(request.user, dia.viaje, empresa_cache)
+            else:
+                for dia in dias:
+                    _ensure_can_review_viaje(request.user, dia.viaje)
+        except UnauthorizedAccessError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+
+        estado_gasto = 'APROBADO' if exento else 'RECHAZADO'
+
+        with transaction.atomic():
+            DiaViaje.objects.filter(id__in=dia_ids).update(exento=exento, revisado=True)
+            Gasto.objects.filter(dia_id__in=dia_ids).update(estado=estado_gasto)
+
+        return Response(
+            {
+                'message': f'Se actualizaron {len(dias)} días de viaje',
+                'count': len(dias),
+                'estado_gastos': estado_gasto
+            },
+            status=status.HTTP_200_OK
+        )

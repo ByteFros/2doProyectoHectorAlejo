@@ -3,7 +3,7 @@ from datetime import date
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.test import APIClient
 
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje, Gasto
@@ -40,7 +40,7 @@ class ViajesHistoryIncludeGastosTests(TestCase):
             dni='12345678A'
         )
 
-        self.empleado_token = Token.objects.create(user=self.empleado_user).key
+        self.empleado_token = str(RefreshToken.for_user(self.empleado_user).access_token)
 
         self.viaje = Viaje.objects.create(
             empleado=self.empleado_profile,
@@ -76,7 +76,7 @@ class ViajesHistoryIncludeGastosTests(TestCase):
 
     def authenticate(self, token=None):
         if token:
-            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         else:
             self.client.credentials()
 
@@ -97,7 +97,8 @@ class ViajesHistoryIncludeGastosTests(TestCase):
         self.assertSetEqual(conceptos, {'Hotel', 'Comidas'})
         for gasto in viaje['gastos']:
             self.assertIn('comprobante', gasto)
-            self.assertIn('comprobante_url', gasto)
+            if gasto['comprobante']:
+                self.assertIn('comprobante_url', gasto)
 
     def test_historial_without_include_excludes_gastos(self):
         self.authenticate(self.empleado_token)

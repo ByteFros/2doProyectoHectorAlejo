@@ -3,7 +3,10 @@ Serializers para el módulo de autenticación
 """
 from django.db import transaction
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
+from .services import build_auth_response
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -117,3 +120,12 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                 )
 
         return RegisterUserSerializer(user).data
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Extiende el serializer JWT para incluir datos del perfil en la respuesta."""
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data.update(build_auth_response(self.user))
+        return data

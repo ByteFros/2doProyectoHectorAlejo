@@ -5,7 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 
 
@@ -25,7 +26,6 @@ class AuthenticationTestCase(TestCase):
         )
         self.master_user.must_change_password = False
         self.master_user.save()
-        self.master_token = Token.objects.create(user=self.master_user).key
 
         # Crear usuario EMPRESA con perfil
         self.empresa_user = CustomUser.objects.create_user(
@@ -40,7 +40,6 @@ class AuthenticationTestCase(TestCase):
             nif='B12345678',
             correo_contacto='empresa@test.com'
         )
-        self.empresa_token = Token.objects.create(user=self.empresa_user).key
 
         # Crear usuario EMPLEADO con perfil
         self.empleado_user = CustomUser.objects.create_user(
@@ -59,14 +58,24 @@ class AuthenticationTestCase(TestCase):
             apellido='Pérez',
             dni='12345678A'
         )
-        self.empleado_token = Token.objects.create(user=self.empleado_user).key
+
+        self.master_access, self.master_refresh = self._generate_tokens(self.master_user)
+        self.empresa_access, self.empresa_refresh = self._generate_tokens(self.empresa_user)
+        self.empleado_access, self.empleado_refresh = self._generate_tokens(self.empleado_user)
+        self.master_token = self.master_access
+        self.empresa_token = self.empresa_access
+        self.empleado_token = self.empleado_access
 
     def authenticate(self, token=None):
         """Helper para establecer credenciales del cliente API"""
         if token:
-            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         else:
             self.client.credentials()
+
+    def _generate_tokens(self, user):
+        refresh = RefreshToken.for_user(user)
+        return str(refresh.access_token), str(refresh)
 
     def test_login_successful_master(self):
         """Test: Login exitoso de usuario MASTER"""
@@ -78,7 +87,8 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('token', response.data)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
         self.assertEqual(response.data['role'], 'MASTER')
         self.assertEqual(response.data['user_id'], self.master_user.id)
         self.assertFalse(response.data['must_change_password'])
@@ -93,7 +103,8 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('token', response.data)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
         self.assertEqual(response.data['role'], 'EMPRESA')
         self.assertEqual(response.data['empresa_id'], self.empresa_profile.id)
 
@@ -107,7 +118,8 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('token', response.data)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
         self.assertEqual(response.data['role'], 'EMPLEADO')
         self.assertEqual(response.data['empleado_id'], self.empleado_profile.id)
         self.assertTrue(response.data['must_change_password'])
@@ -122,7 +134,7 @@ class AuthenticationTestCase(TestCase):
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn('error', response.data)
+        self.assertIn('detail', response.data)
 
     def test_logout_successful(self):
         """Test: Logout exitoso elimina el token"""
@@ -133,20 +145,21 @@ class AuthenticationTestCase(TestCase):
             'password': 'masterpass123'
         }
         login_response = self.client.post(login_url, login_data)
-        token = login_response.data['token']
+        refresh = login_response.data['refresh']
+        access = login_response.data['access']
 
-        # Ahora hacer logout
+        # Logout con el refresh recibido
         logout_url = reverse('logout')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
-        response = self.client.post(logout_url)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+        response = self.client.post(logout_url, {'refresh': refresh})
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
         self.assertIn('message', response.data)
 
-        # Verificar que el token fue eliminado
-        session_url = reverse('session')
-        session_response = self.client.get(session_url)
-        self.assertEqual(session_response.status_code, status.HTTP_401_UNAUTHORIZED)
+        # Intentar usar el refresh token otra vez debe fallar
+        refresh_url = reverse('token_refresh')
+        refresh_response = self.client.post(refresh_url, {'refresh': refresh})
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_logout_without_authentication(self):
         """Test: Logout sin autenticación falla"""
@@ -156,24 +169,21 @@ class AuthenticationTestCase(TestCase):
 
     def test_session_authenticated_user(self):
         """Test: Session devuelve datos del usuario autenticado"""
-        # Login
         login_url = reverse('login')
         login_data = {
             'username': 'master',
             'password': 'masterpass123'
         }
         login_response = self.client.post(login_url, login_data)
-        token = login_response.data['token']
+        access = login_response.data['access']
 
-        # Obtener sesión
         session_url = reverse('session')
-        self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
         response = self.client.get(session_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['username'], 'master')
         self.assertEqual(response.data['role'], 'MASTER')
-        self.assertIn('token', response.data)
 
     def test_session_without_authentication(self):
         """Test: Session sin autenticación falla"""
@@ -183,7 +193,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empresa(self):
         """Test: Registro de usuario tipo EMPRESA"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'nueva_empresa',
@@ -214,7 +224,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empresa_with_autogestion_permissions(self):
         """Test: Registro de empresa con permisos de autogestión"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empresa_autogestion',
@@ -240,7 +250,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empleado_with_salary(self):
         """Test: Registro de empleado permite asignar salario"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empleado_salario',
@@ -263,7 +273,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empleado_with_invalid_empresa(self):
         """Test: Registro de empleado con empresa inválida falla"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empleado_invalido',
@@ -283,7 +293,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empleado_with_negative_salary(self):
         """Test: Registro de empleado con salario negativo lanza error"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empleado_negativo',
@@ -304,7 +314,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_empleado_without_password_uses_default(self):
         """Test: Registro de empleado sin password usa contraseña por defecto"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empleado_sin_password',
@@ -324,7 +334,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_user_duplicate_email(self):
         """Test: Registro con email duplicado falla"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'otro_usuario',
@@ -339,7 +349,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_register_empresa_duplicate_nif(self):
         """Test: Registro de empresa con NIF duplicado falla"""
-        self.authenticate(self.master_token)
+        self.authenticate(self.master_access)
         url = reverse('register')
         data = {
             'username': 'empresa2',
@@ -383,7 +393,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_empresa_registers_employee_for_own_company(self):
         """Test: Empresa solo puede crear empleados ligados a su empresa"""
-        self.authenticate(self.empresa_token)
+        self.authenticate(self.empresa_access)
         url = reverse('register')
         data = {
             'username': 'empleado_empresa',
@@ -404,7 +414,7 @@ class AuthenticationTestCase(TestCase):
 
     def test_empleado_cannot_access_register(self):
         """Test: Empleado autenticado recibe 403 al registrar"""
-        self.authenticate(self.empleado_token)
+        self.authenticate(self.empleado_access)
         url = reverse('register')
         response = self.client.post(url, {})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

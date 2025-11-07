@@ -336,3 +336,28 @@ class Mensaje(models.Model):
 
     def __str__(self):
         return f"{self.autor.username} @ {self.fecha_creacion:%Y-%m-%d %H:%M}"
+
+
+class ConversacionLectura(models.Model):
+    """Almacena el último instante en que un usuario leyó una conversación."""
+
+    conversacion = models.ForeignKey(
+        "Conversacion",
+        on_delete=models.CASCADE,
+        related_name="lecturas"
+    )
+    usuario = models.ForeignKey(
+        "CustomUser",
+        on_delete=models.CASCADE,
+        related_name="lecturas_conversacion"
+    )
+    last_read_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("conversacion", "usuario")
+        verbose_name = "Lectura de conversación"
+        verbose_name_plural = "Lecturas de conversación"
+
+    def __str__(self):
+        return f"Lectura conversacion {self.conversacion_id} - {self.usuario_id}"

@@ -1,11 +1,13 @@
 """
 Servicios de lógica de negocio para empresas y empleados
 """
+import calendar
 import csv
 import io
 import random
 import string
-from decimal import Decimal, InvalidOperation
+from collections import defaultdict
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Dict, List, Optional
 from django.db import transaction
 from django.utils.text import slugify
@@ -13,6 +15,8 @@ from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 from users.common.services import get_user_empresa
 from users.common.exceptions import EmpresaProfileNotFoundError
 from users.common.validators import validate_dni_nie_nif, normalize_documento
+
+EXENCION_7P_MAXIMA = Decimal('60100.00')
 
 
 # ============================================================================
@@ -370,6 +374,40 @@ def process_employee_csv(
         "empleados_omitidos": empleados_omitidos,
         "errores": errores
     }
+
+
+def calcular_exencion_7p_por_dias(
+    salario_anual: Optional[Decimal],
+    dias_por_anio: Dict[int, int]
+) -> Decimal:
+    """Calcula el importe exento proporcional por año."""
+
+    if not salario_anual or not dias_por_anio:
+        return Decimal('0.00')
+
+    salario = Decimal(salario_anual)
+    total = Decimal('0.00')
+
+    for year, dias in dias_por_anio.items():
+        if not dias:
+            continue
+        dias_totales = Decimal('366' if calendar.isleap(year) else '365')
+        diario = salario / dias_totales
+        total += diario * Decimal(dias)
+
+    return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def calcular_exencion_7p_total(
+    salario_anual: Optional[Decimal],
+    dias_por_anio: Dict[int, int]
+) -> Decimal:
+    """Devuelve la exención total respetando el tope legal."""
+
+    importe = calcular_exencion_7p_por_dias(salario_anual, dias_por_anio)
+    if importe > EXENCION_7P_MAXIMA:
+        return EXENCION_7P_MAXIMA
+    return importe
 
 
 # ============================================================================

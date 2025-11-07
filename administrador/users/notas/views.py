@@ -3,7 +3,7 @@ Vistas para gestión de notas de viajes
 """
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,7 +19,7 @@ from users.common.exceptions import (
 
 class NotaViajeListCreateView(APIView):
     """Lista y crea notas para un viaje específico"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, viaje_id):
@@ -67,7 +67,7 @@ class NotaViajeListCreateView(APIView):
 
 class NotaViajeDeleteView(APIView):
     """Elimina una nota de viaje"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, nota_id):

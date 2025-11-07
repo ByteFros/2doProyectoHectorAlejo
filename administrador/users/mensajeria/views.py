@@ -9,12 +9,12 @@ from django.db.models import Prefetch
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, generics
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from users.models import Conversacion, CustomUser, Mensaje, EmpresaProfile, EmpleadoProfile
+from users.models import Conversacion, ConversacionLectura, CustomUser, Mensaje, EmpresaProfile, EmpleadoProfile
 from users.serializers import ConversacionSerializer, MensajeSerializer
 from users.common.exceptions import UnauthorizedAccessError, EmpresaProfileNotFoundError, EmpleadoProfileNotFoundError
 from users.common.services import get_user_empresa, get_user_empleado
@@ -22,6 +22,7 @@ from .utils import (
     get_target_user_or_400,
     get_existing_conversation,
     create_conversation,
+    mark_conversation_as_read,
 )
 
 
@@ -58,7 +59,7 @@ def obtener_mensajes_conversacion(conversacion: Conversacion):
 
 class ContactListView(APIView):
     """Devuelve la lista jerárquica de contactos permitidos para el usuario autenticado"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -203,7 +204,7 @@ class ContactListView(APIView):
 
 class AdminContactView(APIView):
     """Entrega el listado de usuarios con rol MASTER para iniciar conversaciones"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -225,7 +226,7 @@ class AdminContactView(APIView):
 
 class CrearConversacionView(APIView):
     """Crea una conversación entre el usuario autenticado y otro usuario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -258,17 +259,26 @@ class CrearConversacionView(APIView):
 class ListarConversacionesView(generics.ListAPIView):
     """Lista todas las conversaciones en las que participa el usuario"""
     serializer_class = ConversacionSerializer
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return obtener_conversaciones_usuario(self.request.user).prefetch_related('mensajes', 'participantes')
+        usuario = self.request.user
+        lecturas_prefetch = Prefetch(
+            'lecturas',
+            queryset=ConversacionLectura.objects.filter(usuario=usuario)
+        )
+        return obtener_conversaciones_usuario(usuario).prefetch_related(
+            'mensajes',
+            'participantes',
+            lecturas_prefetch
+        )
 
 
 class ListarMensajesByIdView(generics.ListAPIView):
     """Lista todos los mensajes de una conversación"""
     serializer_class = MensajeSerializer
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -279,12 +289,17 @@ class ListarMensajesByIdView(generics.ListAPIView):
         if not puede_participar_conversacion(self.request.user, conversacion):
             return Mensaje.objects.none()
 
-        return obtener_mensajes_conversacion(conversacion)
+        mensajes_qs = obtener_mensajes_conversacion(conversacion)
+        last_message = mensajes_qs.order_by('-fecha_creacion').first()
+        if last_message:
+            mark_conversation_as_read(conversacion, self.request.user, last_message.fecha_creacion)
+
+        return mensajes_qs
 
 
 class EnviarMensajeView(APIView):
     """Envía un mensaje creando la conversación si es necesario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -322,6 +337,7 @@ class EnviarMensajeView(APIView):
         # Enviar mensaje
         try:
             mensaje = enviar_mensaje(conversacion, request.user, contenido, archivo)
+            mark_conversation_as_read(conversacion, request.user, mensaje.fecha_creacion)
             payload = MensajeSerializer(mensaje).data
             payload["conversation_id"] = conversacion.id
             return Response(payload, status=status.HTTP_201_CREATED)
@@ -331,7 +347,7 @@ class EnviarMensajeView(APIView):
 
 class DescargarAdjuntoMensajeView(APIView):
     """Descarga el archivo adjunto de un mensaje de conversación"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, mensaje_id):

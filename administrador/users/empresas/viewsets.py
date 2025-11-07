@@ -2,17 +2,19 @@
 ViewSets para gestión de empresas y empleados con DRF.
 Usa lógica de negocio de common/services y permissions personalizados.
 """
+from collections import defaultdict
+from datetime import timedelta
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from decimal import Decimal
 from django.db.models import Prefetch
 from django.utils import timezone
 
-from users.models import EmpresaProfile, EmpleadoProfile, Viaje, Gasto
+from users.models import EmpresaProfile, EmpleadoProfile, Viaje, DiaViaje
 from users.serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer
 from users.common.services import (
     filter_queryset_by_empresa,
@@ -37,7 +39,9 @@ from .services import (
     delete_empresa,
     create_empleado,
     delete_empleado,
-    process_employee_csv
+    process_employee_csv,
+    calcular_exencion_7p_por_dias,
+    calcular_exencion_7p_total,
 )
 from .permissions import (
     IsMaster,
@@ -68,7 +72,7 @@ class EmpresaViewSet(viewsets.ModelViewSet):
     """
     queryset = EmpresaProfile.objects.select_related('user').all()
     serializer_class = EmpresaProfileSerializer
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated, CanAccessEmpresa]
 
     def get_serializer_class(self):
@@ -244,7 +248,7 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
     """
     queryset = EmpleadoProfile.objects.select_related('user', 'empresa').all()
     serializer_class = EmpleadoProfileSerializer
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated, CanAccessEmpleado]
     filterset_fields = ['empresa', 'dni']
     search_fields = ['nombre', 'apellido', 'dni', 'user__email']
@@ -464,16 +468,16 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-        gastos_aprobados_prefetch = Prefetch(
-            'gasto_set',
-            queryset=Gasto.objects.filter(estado='APROBADO'),
-            to_attr='gastos_aprobados'
+        dias_prefetch = Prefetch(
+            'dias',
+            queryset=DiaViaje.objects.only('fecha', 'exento'),
+            to_attr='dias_cache'
         )
 
         viajes_queryset = (
             Viaje.objects
             .filter(estado__in=['EN_REVISION', 'REABIERTO', 'REVISADO'])
-            .prefetch_related(gastos_aprobados_prefetch)
+            .prefetch_related(dias_prefetch)
             .order_by('fecha_inicio')
         )
         if empresa_filter:
@@ -506,12 +510,28 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
             empleado_data = EmpleadoProfileSerializer(empleado).data
 
             viajes_data = []
-            descuento_total = Decimal('0.00')
+            dias_por_anio_total = defaultdict(int)
             for viaje in getattr(empleado, 'viajes_pendientes', []):
-                gastos_aprobados = getattr(viaje, 'gastos_aprobados', [])
-                descuento = sum((g.monto for g in gastos_aprobados), Decimal('0.00'))
-                descuento = descuento.quantize(Decimal('0.01'))
-                descuento_total += descuento
+                dias_por_anio_viaje = defaultdict(int)
+                dias_exentos_viaje = 0
+                dias_registrados = getattr(viaje, 'dias_cache', [])
+                if dias_registrados:
+                    for dia in dias_registrados:
+                        if not dia.exento:
+                            continue
+                        year = dia.fecha.year
+                        dias_por_anio_total[year] += 1
+                        dias_por_anio_viaje[year] += 1
+                        dias_exentos_viaje += 1
+                else:
+                    total = viaje.dias_viajados or 0
+                    current_date = viaje.fecha_inicio
+                    for _ in range(total):
+                        year = current_date.year
+                        dias_por_anio_total[year] += 1
+                        dias_por_anio_viaje[year] += 1
+                        dias_exentos_viaje += 1
+                        current_date = current_date + timedelta(days=1)
 
                 viajes_data.append({
                     "id": viaje.id,
@@ -525,12 +545,13 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                     "empresa_visitada": viaje.empresa_visitada,
                     "motivo": viaje.motivo,
                     "fecha_solicitud": viaje.fecha_solicitud,
-                    "descuento_viajes": str(descuento)
+                    "dias_exentos": dias_exentos_viaje
                 })
 
             empleado_data['viajes_pendientes'] = viajes_data
             empleado_data['total_viajes_pendientes'] = len(viajes_data)
-            empleado_data['descuento_viajes'] = str(descuento_total.quantize(Decimal('0.01')))
+            total_exento = calcular_exencion_7p_total(empleado.salario, dias_por_anio_total)
+            empleado_data['descuento_viajes'] = str(total_exento)
             data.append(empleado_data)
 
         return Response(data, status=status.HTTP_200_OK)

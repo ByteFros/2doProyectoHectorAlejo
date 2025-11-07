@@ -12,6 +12,7 @@ from .views import (
     EmployeeCityStatsView,
     DiaViajeListView,
     DiaViajeReviewView,
+    DiaViajeBatchReviewView,
     ViajeDetailView
 )
 
@@ -36,4 +37,5 @@ urlpatterns = [
     # Gestión de días de viaje
     path('viajes/<int:viaje_id>/dias/', DiaViajeListView.as_view(), name='dias-list'),
     path('dias/<int:dia_id>/review/', DiaViajeReviewView.as_view(), name='dias-review'),
+    path('dias/review/batch/', DiaViajeBatchReviewView.as_view(), name='dias-review-batch'),
 ]

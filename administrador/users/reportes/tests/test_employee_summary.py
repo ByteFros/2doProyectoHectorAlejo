@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.urls import reverse
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.test import APIClient
 from rest_framework import status
 from django.utils import timezone
@@ -19,7 +19,7 @@ class EmployeeSummaryReportTests(TestCase):
             password='pass',
             role='MASTER'
         )
-        self.master_token = Token.objects.create(user=self.master).key
+        self.master_token = str(RefreshToken.for_user(self.master).access_token)
 
         self.empresa_user = CustomUser.objects.create_user(
             username='empresa',
@@ -33,7 +33,7 @@ class EmployeeSummaryReportTests(TestCase):
             nif='B12345678',
             correo_contacto='empresa@example.com'
         )
-        self.empresa_token = Token.objects.create(user=self.empresa_user).key
+        self.empresa_token = str(RefreshToken.for_user(self.empresa_user).access_token)
 
         self.employee_user = CustomUser.objects.create_user(
             username='empleado',
@@ -48,7 +48,7 @@ class EmployeeSummaryReportTests(TestCase):
             apellido='Pérez',
             dni='12345678A'
         )
-        self.employee_token = Token.objects.create(user=self.employee_user).key
+        self.employee_token = str(RefreshToken.for_user(self.employee_user).access_token)
 
         # Crear viajes y días para el empleado
         today = timezone.now().date()
@@ -74,7 +74,7 @@ class EmployeeSummaryReportTests(TestCase):
 
     def authenticate(self, token=None):
         if token:
-            self.client.credentials(HTTP_AUTHORIZATION=f'Token {token}')
+            self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         else:
             self.client.credentials()
 

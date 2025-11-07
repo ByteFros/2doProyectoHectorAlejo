@@ -1,6 +1,6 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import CustomUser, EmpresaProfile, Notificacion
 
@@ -35,9 +35,12 @@ class NotificacionesViewTest(TestCase):
             usuario_destino=empresa_user
         )
 
+    def _authenticate(self, user):
+        access = RefreshToken.for_user(user).access_token
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
     def test_master_puede_listar_notificaciones_de_empresa(self):
-        token = Token.objects.create(user=self.master)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        self._authenticate(self.master)
 
         response = self.client.get(
             "/api/users/notificaciones/",
@@ -50,8 +53,7 @@ class NotificacionesViewTest(TestCase):
         self.assertEqual(response.data[0]["mensaje"], self.notificacion.mensaje)
 
     def test_master_puede_ver_todas_las_notificaciones(self):
-        token = Token.objects.create(user=self.master)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        self._authenticate(self.master)
 
         response = self.client.get("/api/users/notificaciones/", format='json')
 
@@ -60,8 +62,7 @@ class NotificacionesViewTest(TestCase):
         self.assertEqual(response.data[0]["mensaje"], self.notificacion.mensaje)
 
     def test_no_master_no_puede_listar_otras_notificaciones(self):
-        empresa_token = Token.objects.create(user=self.empresa.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {empresa_token.key}")
+        self._authenticate(self.empresa.user)
 
         response = self.client.get(
             "/api/users/notificaciones/",

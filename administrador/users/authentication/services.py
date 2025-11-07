@@ -31,52 +31,25 @@ def get_user_profile_data(user):
     return profile_data
 
 
-def build_auth_response(user, token):
-    """
-    Construye la respuesta de autenticación con todos los datos necesarios.
-
-    Args:
-        user: Instancia de CustomUser
-        token: Token de autenticación
-
-    Returns:
-        dict: Respuesta completa con datos del usuario y token
-    """
+def build_auth_response(user):
+    """Datos comunes incluidos en las respuestas de autenticación."""
     response = {
-        "token": token.key,
         "role": user.role,
         "must_change_password": user.must_change_password,
         "user_id": user.id,
     }
 
-    # Agregar datos del perfil específico
     profile_data = get_user_profile_data(user)
     response.update(profile_data)
 
     return response
 
 
-def build_session_response(user, token):
-    """
-    Construye la respuesta de sesión con los datos del usuario.
-
-    Args:
-        user: Instancia de CustomUser
-        token: Token de autenticación
-
-    Returns:
-        dict: Respuesta con datos de la sesión
-    """
+def build_session_response(user):
+    """Respuesta serializada para `/session/`."""
     response = {
         "username": user.username,
-        "role": user.role,
-        "token": token.key if token else None,
-        "must_change_password": user.must_change_password,
-        "user_id": user.id,
+        "email": user.email,
     }
-
-    # Agregar datos del perfil específico
-    profile_data = get_user_profile_data(user)
-    response.update(profile_data)
-
+    response.update(build_auth_response(user))
     return response

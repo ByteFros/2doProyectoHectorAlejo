@@ -4,7 +4,7 @@ Vistas para gestión de notificaciones
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,7 +17,7 @@ User = get_user_model()
 
 class ListaNotificacionesView(APIView):
     """Lista las notificaciones del usuario autenticado y permite marcarlas como leídas"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -102,7 +102,7 @@ class ListaNotificacionesView(APIView):
 
 class CrearNotificacionView(APIView):
     """Crea una notificación para un usuario específico"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

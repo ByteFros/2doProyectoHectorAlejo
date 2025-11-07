@@ -1,9 +1,11 @@
 """Servicios auxiliares para el módulo de mensajería."""
 
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from users.models import (
     Conversacion,
+    ConversacionLectura,
     CustomUser,
     EmpresaProfile,
     EmpleadoProfile,
@@ -71,8 +73,32 @@ def get_existing_conversation(user_a: CustomUser, user_b: CustomUser) -> Convers
         if len(participantes_ids) == 2 and user_b.id in participantes_ids:
             return conversacion
     return None
+
+
 def create_conversation(user: CustomUser, target_user: CustomUser) -> Conversacion:
     """Crea una conversación 1:1 (ya verificado que no existe)."""
     conversacion = Conversacion.objects.create()
     conversacion.participantes.add(user, target_user)
     return conversacion
+
+
+def mark_conversation_as_read(
+    conversacion: Conversacion,
+    usuario: CustomUser,
+    timestamp=None
+) -> ConversacionLectura:
+    """Actualiza el instante de lectura más reciente para un usuario."""
+
+    if timestamp is None:
+        timestamp = timezone.now()
+
+    lectura, _ = ConversacionLectura.objects.get_or_create(
+        conversacion=conversacion,
+        usuario=usuario,
+    )
+
+    if not lectura.last_read_at or timestamp > lectura.last_read_at:
+        lectura.last_read_at = timestamp
+        lectura.save(update_fields=["last_read_at", "updated_at"])
+
+    return lectura

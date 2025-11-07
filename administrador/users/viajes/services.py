@@ -78,7 +78,7 @@ def crear_viaje(
     dias_viajados = (fecha_fin - fecha_inicio).days + 1
 
     # Crear viaje
-    return Viaje.objects.create(
+    viaje = Viaje.objects.create(
         empleado=empleado,
         empresa=empleado.empresa,
         destino=destino,
@@ -92,6 +92,10 @@ def crear_viaje(
         es_internacional=es_internacional,
         dias_viajados=dias_viajados
     )
+
+    crear_dias_viaje(viaje)
+
+    return viaje
 
 
 # ============================================================================

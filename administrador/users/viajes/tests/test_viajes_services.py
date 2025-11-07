@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import (
     EmpresaProfile,
@@ -28,6 +28,10 @@ from users.viajes.services import (
 )
 
 User = get_user_model()
+
+
+def get_access_token(user):
+    return str(RefreshToken.for_user(user).access_token)
 
 
 class ViajesServicesBase(TestCase):
@@ -191,7 +195,7 @@ class CambiarEstadoViajeViewTest(TestCase):
             password="pass",
             role="MASTER"
         )
-        self.master_token = Token.objects.create(user=self.master_user)
+        self.master_token = get_access_token(self.master_user)
 
         self.empresa_user = User.objects.create_user(
             username="empresa",
@@ -220,7 +224,7 @@ class CambiarEstadoViajeViewTest(TestCase):
             apellido="Revisada",
             dni="22334455L"
         )
-        self.empleado_token = Token.objects.create(user=self.empleado_user)
+        self.empleado_token = get_access_token(self.empleado_user)
 
         self.viaje = Viaje.objects.create(
             empleado=self.empleado,
@@ -268,7 +272,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.gasto.estado = "RECHAZADO"
         self.gasto.save(update_fields=['estado'])
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.master_token}")
         response = self.client.post(
             self.transition_url,
             {
@@ -297,7 +301,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.dia.revisado = False
         self.dia.save(update_fields=['revisado'])
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.master_token}")
         response = self.client.post(
             self.transition_url,
             {"target_state": "REVISADO"},
@@ -307,7 +311,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.assertIn(self.dia.fecha.isoformat(), response.data.get("error", ""))
 
     def _reabrir_viaje(self):
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.master_token}")
 
         response = self.client.post(
             self.transition_url,
@@ -336,7 +340,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.viaje.estado = "EN_REVISION"
         self.viaje.save(update_fields=['estado'])
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.master_token}")
         response = self.client.post(
             f"/api/users/viajes/{self.viaje.id}/transition/",
             {"target_state": "REABIERTO"},
@@ -344,10 +348,10 @@ class CambiarEstadoViajeViewTest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    def test_empleado_no_puede_crear_gasto_en_reabierto(self):
+    def test_empleado_puede_crear_gasto_en_reabierto(self):
         self._reabrir_viaje()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.empleado_token}")
         response = self.client.post(
             "/api/users/gastos/new/",
             {
@@ -358,28 +362,25 @@ class CambiarEstadoViajeViewTest(TestCase):
             },
             format='multipart'
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("No puedes registrar nuevos gastos", response.data.get("error", ""))
+        self.assertEqual(response.status_code, 201)
 
-    def test_empleado_no_puede_modificar_monto_en_reabierto(self):
+    def test_empleado_puede_modificar_monto_en_reabierto(self):
         self._reabrir_viaje()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.empleado_token}")
         response = self.client.patch(
             f"/api/users/gastos/edit/{self.gasto.id}/",
             {"monto": "150.00"},
             format='multipart'
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(
-            response.data.get("error"),
-            "Solo se permite adjuntar documentación en viajes reabiertos."
-        )
+        self.assertEqual(response.status_code, 200)
+        self.gasto.refresh_from_db()
+        self.assertEqual(str(self.gasto.monto), '150.00')
 
     def test_empleado_puede_adjuntar_comprobante_en_reabierto(self):
         self._reabrir_viaje()
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.empleado_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.empleado_token}")
         archivo = SimpleUploadedFile("ticket.pdf", b"fake pdf content", content_type="application/pdf")
         response = self.client.patch(
             f"/api/users/gastos/edit/{self.gasto.id}/",
@@ -394,7 +395,7 @@ class CambiarEstadoViajeViewTest(TestCase):
         self.empresa.has_pending_review_changes = False
         self.empresa.save(update_fields=["has_pending_review_changes"])
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.master_token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.master_token}")
         response = self.client.put(
             f"/api/users/gastos/{self.gasto.id}/",
             {"estado": "RECHAZADO"},
@@ -418,7 +419,7 @@ class EliminarViajeViewTest(TestCase):
             password="pass",
             role="MASTER"
         )
-        self.master_token = Token.objects.create(user=self.master_user).key
+        self.master_token = get_access_token(self.master_user)
 
         self.empresa_user = User.objects.create_user(
             username="empresa_del",
@@ -432,7 +433,7 @@ class EliminarViajeViewTest(TestCase):
             nif="B99999999",
             correo_contacto="empresa_del@test.com",
         )
-        self.empresa_token = Token.objects.create(user=self.empresa_user).key
+        self.empresa_token = get_access_token(self.empresa_user)
 
         self.empleado_user = User.objects.create_user(
             username="empleado_del",
@@ -447,7 +448,7 @@ class EliminarViajeViewTest(TestCase):
             apellido="García",
             dni="55555555A",
         )
-        self.empleado_token = Token.objects.create(user=self.empleado_user).key
+        self.empleado_token = get_access_token(self.empleado_user)
 
         self.viaje = Viaje.objects.create(
             empleado=self.empleado,
@@ -461,7 +462,7 @@ class EliminarViajeViewTest(TestCase):
 
     def _delete(self, token, viaje_id=None):
         viaje_id = viaje_id or self.viaje.id
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
         return self.client.delete(f"/api/users/viajes/{viaje_id}/")
 
     def test_empleado_elimina_viaje_en_revision(self):
@@ -491,7 +492,7 @@ class EliminarViajeViewTest(TestCase):
             apellido="López",
             dni="55555555B",
         )
-        otro_token = Token.objects.create(user=otro_user).key
+        otro_token = get_access_token(otro_user)
 
         response = self._delete(otro_token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

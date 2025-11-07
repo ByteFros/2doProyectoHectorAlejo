@@ -576,10 +576,11 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
 class ConversacionSerializer(serializers.ModelSerializer):
     participantes = serializers.StringRelatedField(many=True)
     last_message = serializers.SerializerMethodField()
+    has_unread = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversacion
-        fields = ['id', 'participantes', 'fecha_creacion', 'last_message']
+        fields = ['id', 'participantes', 'fecha_creacion', 'last_message', 'has_unread']
 
     def get_last_message(self, obj):
         last_message = obj.mensajes.order_by('-fecha_creacion').first()
@@ -601,6 +602,29 @@ class ConversacionSerializer(serializers.ModelSerializer):
             "archivo": archivo_url,
             "fecha_creacion": last_message.fecha_creacion,
         }
+
+    def get_has_unread(self, obj):
+        request = self.context.get('request') if hasattr(self, 'context') else None
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+
+        last_message = obj.mensajes.order_by('-fecha_creacion').first()
+        if not last_message:
+            return False
+
+        lectura = None
+        prefetched = getattr(obj, '_prefetched_objects_cache', {})
+        if prefetched.get('lecturas') is not None:
+            lecturas = prefetched['lecturas']
+            lectura = lecturas[0] if lecturas else None
+        else:
+            lectura = obj.lecturas.filter(usuario=user).first()
+
+        if not lectura or not lectura.last_read_at:
+            return True
+
+        return last_message.fecha_creacion > lectura.last_read_at
 
 class MensajeSerializer(serializers.ModelSerializer):
     autor = serializers.StringRelatedField()

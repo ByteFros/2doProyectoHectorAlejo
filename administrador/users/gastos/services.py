@@ -23,11 +23,6 @@ def validar_viaje_para_gasto(viaje: Viaje) -> None:
     """
     if viaje.estado == "REVISADO":
         raise ValueError("No puedes registrar gastos en viajes revisados")
-    if viaje.estado == "REABIERTO":
-        raise ValueError(
-            "No puedes registrar nuevos gastos en un viaje reabierto. "
-            "Adjunta la documentación al gasto existente."
-        )
 
 
 def validar_estado_gasto(estado: str) -> None:

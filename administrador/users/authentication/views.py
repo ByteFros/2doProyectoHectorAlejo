@@ -1,66 +1,52 @@
-"""
-Vistas para autenticación de usuarios
-"""
-from django.contrib.auth import authenticate
+"""Vistas para autenticación de usuarios."""
+
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
-from .serializers import RegisterUserSerializer
-from .services import build_auth_response, build_session_response
+from .serializers import RegisterUserSerializer, CustomTokenObtainPairSerializer
+from .services import build_session_response
 
 
-class LoginView(APIView):
-    """
-    Autentica un usuario y devuelve su token y datos de perfil.
-    """
-    authentication_classes = [TokenAuthentication]
+class LoginView(TokenObtainPairView):
+    """Entrega pares access/refresh junto con los metadatos del usuario."""
+
     permission_classes = [AllowAny]
-
-    def post(self, request):
-        username = request.data.get('username')
-        password = request.data.get('password')
-
-        user = authenticate(username=username, password=password)
-        if not user:
-            return Response(
-                {"error": "Credenciales inválidas"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-
-        token, _ = Token.objects.get_or_create(user=user)
-        response_data = build_auth_response(user, token)
-
-        return Response(response_data, status=status.HTTP_200_OK)
+    serializer_class = CustomTokenObtainPairSerializer
 
 
 class LogoutView(APIView):
-    """
-    Cierra la sesión del usuario eliminando su token.
-    """
-    authentication_classes = [TokenAuthentication]
+    """Invalida el refresh token recibido (requiere blacklist habilitado)."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response(
+                {"error": "Debes proporcionar el refresh token"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            request.auth.delete()
-            return Response(
-                {"message": "Sesión cerrada correctamente"},
-                status=status.HTTP_200_OK
-            )
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"message": "Sesión cerrada correctamente"},
+            status=status.HTTP_205_RESET_CONTENT,
+        )
 
 
 class RegisterUserView(APIView):
     """Registra nuevos usuarios controlando el rol del solicitante."""
-    authentication_classes = [TokenAuthentication]
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -93,15 +79,11 @@ class RegisterUserView(APIView):
 
 
 class SessionView(APIView):
-    """
-    Valida la sesión actual y devuelve los datos del usuario autenticado.
-    """
-    authentication_classes = [TokenAuthentication]
+    """Devuelve los datos del usuario autenticado usando el JWT actual."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
-        token = request.auth
-        response_data = build_session_response(user, token)
-
+        response_data = build_session_response(user)
         return Response(response_data)

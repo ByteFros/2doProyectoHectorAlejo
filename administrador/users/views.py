@@ -1,11 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import EmpresaProfile, EmpleadoProfile
 from .serializers import CustomUserSerializer, EmpleadoProfileSerializer
@@ -14,7 +13,7 @@ User = get_user_model()
 
 
 class UserDetailView(APIView):
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -58,14 +57,13 @@ class UserDetailView(APIView):
     def delete(self, request):
         """Eliminar usuario autenticado y su token."""
         user = request.user
-        Token.objects.filter(user=user).delete()  # 🔹 Elimina el token antes de borrar el usuario
         user.delete()
         return Response({"message": "Usuario eliminado exitosamente."}, status=status.HTTP_204_NO_CONTENT)
 
 
 class EmpresaEmpleadosView(APIView):
     """Obtener empleados de la empresa autenticada"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -96,7 +94,7 @@ class EmpresaEmpleadosView(APIView):
 
 class EmployeeListView(APIView):
     """Vista para listar los empleados"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -119,7 +117,7 @@ class EmployeeListView(APIView):
 
 class EmpleadosPorEmpresaView(APIView):
     """MASTER puede ver empleados de cualquier empresa; EMPRESA sólo los suyos"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empresa_id):

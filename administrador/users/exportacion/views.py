@@ -3,7 +3,7 @@ Vistas para exportación de datos
 """
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework.authentication import TokenAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -30,7 +30,7 @@ from .services import (
 
 class ExportMasterCSVView(APIView):
     """Exporta los viajes de empleados de todas las empresas (MASTER only)"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -52,7 +52,7 @@ class ExportMasterCSVView(APIView):
 
 class ExportEmpresaCSVView(APIView):
     """Exporta los viajes de empleados de la empresa logueada en formato CSV"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -80,7 +80,7 @@ class ExportEmpresaCSVView(APIView):
 
 class ExportViajesGastosView(APIView):
     """Exporta viajes con sus gastos asociados según el rol del usuario"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -104,7 +104,7 @@ class ExportViajesGastosView(APIView):
 
 class ExportEmpleadoIndividualView(APIView):
     """Exporta los viajes con gastos de un empleado específico"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empleado_id):
@@ -147,7 +147,7 @@ class ExportEmpleadoIndividualView(APIView):
 
 class ExportViajesGastosZipView(APIView):
     """Exporta viajes con gastos y archivos comprobantes en formato ZIP"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -174,7 +174,7 @@ class ExportViajesGastosZipView(APIView):
 
 class ExportEmpleadoIndividualZipView(APIView):
     """Exporta los viajes con gastos y archivos de un empleado específico en ZIP"""
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, empleado_id):

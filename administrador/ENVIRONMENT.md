@@ -10,6 +10,13 @@ Este documento resume las variables de entorno soportadas por el backend y cómo
 - `DJANGO_ALLOWED_HOSTS`: Lista separada por comas de hosts permitidos (`localhost,127.0.0.1`).
 - `PORT`: Puerto expuesto por Gunicorn dentro del contenedor (por defecto `8000`).
 
+### JWT
+
+- `JWT_ACCESS_TTL_MINUTES`: duración del access token JSON Web Token en minutos (p.ej. 15).
+- `JWT_REFRESH_TTL_DAYS`: duración del refresh token en días para obligar al usuario a reautenticarse pasado ese plazo.
+- `JWT_ROTATE_REFRESH_TOKENS`: si es `True`, cada refresh entrega un nuevo par y el anterior queda invalidado.
+- `JWT_BLACKLIST_AFTER_ROTATION`: requiere la app `token_blacklist`; marca el refresh previo como inválido al rotar.
+
 ## Base de datos
 
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`: Credenciales y host de PostgreSQL utilizados por Django y los servicios Docker.
