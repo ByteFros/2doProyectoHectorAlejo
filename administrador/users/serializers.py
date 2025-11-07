@@ -626,6 +626,7 @@ class TripsPerMonthSerializer(serializers.Serializer):
     totalTrips = serializers.IntegerField()  # Número de viajes iniciados en el mes
     pendingTrips = serializers.IntegerField()   # Viajes pendientes de revisión en el mes
     reviewedTrips = serializers.IntegerField()  # Viajes revisados en el mes
+    rejectedTrips = serializers.IntegerField()  # Viajes con al menos un gasto rechazado en el mes
 
 class TripsTypeSerializer(serializers.Serializer):
     national = serializers.IntegerField()

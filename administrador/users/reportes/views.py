@@ -345,6 +345,8 @@ class TripsPerMonthView(APIView):
             raise UnauthorizedAccessError(str(exc))
 
         viajes = visible_viajes.queryset
+        gastos_relation = 'gastos_snapshot' if visible_viajes.uses_snapshot else 'gasto'
+        rejected_filter = Q(**{f"{gastos_relation}__estado": "RECHAZADO"})
 
         # Filtrado por año (opcional)
         year_param = request.query_params.get('year')
@@ -363,9 +365,10 @@ class TripsPerMonthView(APIView):
             viajes.annotate(month=TruncMonth('fecha_inicio'))
             .values('month')
             .annotate(
-                totalTrips=Count('pk'),
-                pendingTrips=Count('pk', filter=Q(estado__in=['EN_REVISION', 'REABIERTO'])),
-                reviewedTrips=Count('pk', filter=Q(estado='REVISADO'))
+                totalTrips=Count('pk', distinct=True),
+                pendingTrips=Count('pk', filter=Q(estado__in=['EN_REVISION', 'REABIERTO']), distinct=True),
+                reviewedTrips=Count('pk', filter=Q(estado='REVISADO'), distinct=True),
+                rejectedTrips=Count('pk', filter=rejected_filter, distinct=True)
             )
             .order_by('month')
         )
@@ -389,6 +392,7 @@ class TripsPerMonthView(APIView):
                 'totalTrips': v['totalTrips'],
                 'pendingTrips': v['pendingTrips'],
                 'reviewedTrips': v['reviewedTrips'],
+                'rejectedTrips': v['rejectedTrips'],
             })
 
         return Response({
