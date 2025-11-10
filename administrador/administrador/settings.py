@@ -78,6 +78,9 @@ REST_FRAMEWORK = {
     ],
 }
 
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB por archivo
+DATA_UPLOAD_MAX_MEMORY_SIZE = 12 * 1024 * 1024  # 12 MB por request (multipart + payload)
+
 JWT_ACCESS_TTL_MINUTES = int(os.getenv("JWT_ACCESS_TTL_MINUTES", "15"))
 JWT_REFRESH_TTL_DAYS = int(os.getenv("JWT_REFRESH_TTL_DAYS", "7"))
 JWT_ROTATE_REFRESH_TOKENS = get_bool(os.getenv("JWT_ROTATE_REFRESH_TOKENS"), True)

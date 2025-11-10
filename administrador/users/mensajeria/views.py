@@ -10,7 +10,9 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, generics
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.conf import settings
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -18,6 +20,7 @@ from users.models import Conversacion, ConversacionLectura, CustomUser, Mensaje,
 from users.serializers import ConversacionSerializer, MensajeSerializer
 from users.common.exceptions import UnauthorizedAccessError, EmpresaProfileNotFoundError, EmpleadoProfileNotFoundError
 from users.common.services import get_user_empresa, get_user_empleado
+from users.common.files import compress_if_image
 from .utils import (
     get_target_user_or_400,
     get_existing_conversation,
@@ -38,7 +41,7 @@ def enviar_mensaje(
     archivo=None
 ) -> Mensaje:
     """Crea un mensaje dentro de una conversación"""
-    if not contenido or not contenido.strip():
+    if (not contenido or not contenido.strip()) and not archivo:
         raise ValueError("El contenido no puede estar vacío")
 
     return Mensaje.objects.create(
@@ -301,6 +304,7 @@ class EnviarMensajeView(APIView):
     """Envía un mensaje creando la conversación si es necesario"""
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request):
         contenido = request.data.get("contenido", "")
@@ -315,6 +319,15 @@ class EnviarMensajeView(APIView):
 
         if not archivo and not contenido:
             return Response({"error": "El mensaje debe incluir contenido o un archivo."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if archivo:
+            if archivo.size > getattr(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024):
+                return Response(
+                    {"error": "El archivo supera el límite permitido (10 MB)."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            compression_result = compress_if_image(archivo)
+            archivo = compression_result.file
 
         conversacion = None
 

@@ -4,6 +4,9 @@
 
 {$CADDY_DOMAIN} {
     encode gzip zstd
+    request_body {
+        max_size 12MB
+    }
 
     handle_path /static/* {
         root * /srv/static

@@ -1,6 +1,12 @@
-from django.test import TestCase
+import shutil
+import tempfile
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from PIL import Image
 
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Conversacion, Mensaje
 
@@ -241,3 +247,85 @@ class ConversacionCreationTest(TestCase):
         response = self.client.get(f'{API_BASE}/conversaciones/')
         convo = next(item for item in response.data if item['id'] == conversacion.id)
         self.assertTrue(convo['has_unread'])
+
+
+class EnviarMensajeCompressionTest(TestCase):
+    def setUp(self):
+        self.temp_media = tempfile.mkdtemp()
+        self.override = override_settings(MEDIA_ROOT=self.temp_media)
+        self.override.enable()
+        super().setUp()
+
+        self.client = APIClient()
+
+        self.user_a = CustomUser.objects.create_user(
+            username='user_a',
+            email='user_a@test.com',
+            password='pass',
+            role='MASTER'
+        )
+        self.user_b = CustomUser.objects.create_user(
+            username='user_b',
+            email='user_b@test.com',
+            password='pass',
+            role='EMPRESA'
+        )
+        self.token_a = self._token(self.user_a)
+
+        self.conversacion = Conversacion.objects.create()
+        self.conversacion.participantes.add(self.user_a, self.user_b)
+
+    def tearDown(self):
+        super().tearDown()
+        self.override.disable()
+        shutil.rmtree(self.temp_media, ignore_errors=True)
+
+    def _token(self, user):
+        return str(RefreshToken.for_user(user).access_token)
+
+    def _image_upload(self, size=(3200, 2400), name="photo.jpg"):
+        buffer = BytesIO()
+        Image.new("RGB", size, (120, 10, 10)).save(buffer, format="JPEG", quality=95)
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
+
+    def test_envio_con_imagen_se_comprime(self):
+        upload = self._image_upload()
+        original_size = upload.size
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token_a}')
+        response = self.client.post(
+            f'{API_BASE}/mensajes/enviar/',
+            {
+                "conversacion_id": self.conversacion.id,
+                "contenido": "",
+                "archivo": upload
+            },
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mensaje = Mensaje.objects.get(id=response.data['id'])
+        self.assertTrue(mensaje.archivo.name.endswith('.webp'))
+        self.assertLess(mensaje.archivo.size, original_size)
+
+        with Image.open(mensaje.archivo.path) as optimized:
+            self.assertLessEqual(max(optimized.size), 1920)
+
+    def test_envio_con_archivo_no_imagen_no_modifica(self):
+        payload = SimpleUploadedFile("doc.txt", b"just text", content_type="text/plain")
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.token_a}')
+        response = self.client.post(
+            f'{API_BASE}/mensajes/enviar/',
+            {
+                "conversacion_id": self.conversacion.id,
+                "contenido": "",
+                "archivo": payload
+            },
+            format='multipart'
+        )
+
+        self.assertEqual(response.status_code, 201)
+        mensaje = Mensaje.objects.get(id=response.data['id'])
+        self.assertTrue(mensaje.archivo.name.endswith('doc.txt'))
+        self.assertEqual(mensaje.archivo.size, payload.size)

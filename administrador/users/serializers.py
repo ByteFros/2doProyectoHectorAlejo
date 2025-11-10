@@ -1,8 +1,10 @@
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 import re
 from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
     DiaViaje, Conversacion, Mensaje, ViajeReviewSnapshot, GastoReviewSnapshot
+from users.common.files import compress_if_image
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -121,6 +123,17 @@ class GastoSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "estado", "fecha_solicitud", "viaje"]
 
+    def validate_comprobante(self, value):
+        limit = getattr(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024)
+        if value and value.size > limit:
+            raise serializers.ValidationError("El comprobante supera el límite permitido (10 MB).")
+        return value
+
+    def _prepare_comprobante(self, comprobante):
+        if not comprobante:
+            return comprobante
+        return compress_if_image(comprobante, prefer_detail=True).file
+
     def get_viaje(self, obj):
         if obj.viaje:
             return {
@@ -135,6 +148,9 @@ class GastoSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # 1) Extraemos el viaje
         viaje = Viaje.objects.get(id=validated_data.pop("viaje_id"))
+        comprobante = validated_data.get("comprobante")
+        if comprobante:
+            validated_data["comprobante"] = self._prepare_comprobante(comprobante)
 
         # 2) Sacamos fecha_gasto si vino, o tomamos la fecha local de hoy
         fecha = validated_data.pop("fecha_gasto", None)
@@ -177,6 +193,9 @@ class GastoSerializer(serializers.ModelSerializer):
                     field: "No se puede modificar este campo mientras el viaje está reabierto."
                     for field in invalid_fields
                 })
+        comprobante = validated_data.get("comprobante")
+        if comprobante:
+            validated_data["comprobante"] = self._prepare_comprobante(comprobante)
         return super().update(instance, validated_data)
 
 

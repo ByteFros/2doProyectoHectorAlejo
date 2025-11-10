@@ -3,8 +3,10 @@ Servicios de lógica de negocio para gastos
 """
 from typing import Dict, Optional
 from django.core.files.uploadedfile import UploadedFile
+from django.conf import settings
 from users.models import Gasto, EmpleadoProfile, EmpresaProfile, Viaje
 from users.common.services import mark_company_review_pending
+from users.common.files import compress_if_image
 
 
 # ============================================================================
@@ -43,6 +45,17 @@ def validar_estado_gasto(estado: str) -> None:
 # SERVICIOS DE GASTOS
 # ============================================================================
 
+FILE_UPLOAD_LIMIT = getattr(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024)
+
+
+def _prepare_comprobante(comprobante: Optional[UploadedFile]):
+    if not comprobante:
+        return None
+    if comprobante.size > FILE_UPLOAD_LIMIT:
+        raise ValueError("El comprobante supera el límite permitido (10 MB).")
+    return compress_if_image(comprobante, prefer_detail=True).file
+
+
 def crear_gasto(
     empleado: EmpleadoProfile,
     viaje: Viaje,
@@ -74,6 +87,8 @@ def crear_gasto(
     validar_viaje_para_gasto(viaje)
 
     # Crear gasto
+    comprobante_file = _prepare_comprobante(comprobante)
+
     gasto = Gasto.objects.create(
         empleado=empleado,
         empresa=empleado.empresa,
@@ -81,7 +96,7 @@ def crear_gasto(
         concepto=concepto,
         monto=monto,
         fecha_gasto=fecha_gasto,
-        comprobante=comprobante,
+        comprobante=comprobante_file,
         descripcion=descripcion or "",
         estado="PENDIENTE"
     )
@@ -118,7 +133,7 @@ def actualizar_gasto(
     if fecha_gasto is not None:
         gasto.fecha_gasto = fecha_gasto
     if comprobante is not None:
-        gasto.comprobante = comprobante
+        gasto.comprobante = _prepare_comprobante(comprobante)
     if descripcion is not None:
         gasto.descripcion = descripcion
 

@@ -16,8 +16,16 @@ Permite que usuarios con roles MASTER, EMPRESA y EMPLEADO intercambien mensajes 
 | GET | `/api/users/conversaciones/` | Conversaciones del usuario con `last_message` y `has_unread`. | Prefetch de participantes y lecturas. |
 | POST | `/api/users/conversaciones/crear/` | Inicia una conversación 1:1. | Valida relaciones (empresa-empleado, master, etc.). |
 | GET | `/api/users/conversaciones/<id>/mensajes/` | Mensajes ordenados por fecha ascendente. | Marca la conversación como leída para el solicitante. |
-| POST | `/api/users/mensajes/enviar/` | Envía un mensaje con texto y/o archivo. | Crea conversación si sólo se pasa `to_user_id`. |
+| POST | `/api/users/mensajes/enviar/` | Envía un mensaje con texto y/o archivo. | Crea conversación si sólo se pasa `to_user_id`. Requiere `multipart/form-data`. Archivos >10 MB se rechazan y, si el adjunto es una imagen, se comprime automáticamente (máx. 1920 px, 1–2 MB). |
 | GET | `/api/users/mensajes/<id>/file/` | Descarga el adjunto de un mensaje. | Verifica que el usuario participe en la conversación. |
+
+### Adjuntos y compresión de imágenes
+
+* El endpoint `POST /api/users/mensajes/enviar/` acepta archivos mediante `multipart/form-data`. Se debe enviar al menos `contenido` o `archivo`.
+* El límite duro por adjunto es **10 MB**; el servidor devuelve 400 si se intenta subir un archivo mayor.
+* Cuando el archivo es una imagen (JPEG, PNG, WebP, etc.) se optimiza automáticamente: se corrige la orientación EXIF, se limita la dimensión larga a **1920 px** y se re-encodea (WebP/JPEG) apuntando a 1–2 MB para mantener la legibilidad.
+* Los archivos que no son imágenes (PDF, TXT, ZIP, etc.) no se modifican y se guardan tal cual.
+* La descarga (`GET /mensajes/<id>/file/`) siempre expone el archivo final almacenado tras la optimización.
 
 ## Estado de lectura (pull)
 
