@@ -278,11 +278,17 @@ SESSION_COOKIE_SECURE = get_bool(os.getenv("SESSION_COOKIE_SECURE"), DJANGO_ENV 
 SESSION_COOKIE_SAMESITE = 'Lax'  # Cambiado de None a Lax
 CSRF_COOKIE_SAMESITE = 'Lax'     # Cambiado de None a Lax
 
+default_frontend_url = (
+    "https://tr7p.es" if DJANGO_ENV == "production" else "http://localhost:5173"
+)
+raw_frontend_url = os.getenv("FRONTEND_BASE_URL", "").strip() or default_frontend_url
+FRONTEND_BASE_URL = raw_frontend_url.rstrip("/")
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+EMAIL_USE_TLS = get_bool(os.getenv("EMAIL_USE_TLS"), True)
+EMAIL_USE_SSL = get_bool(os.getenv("EMAIL_USE_SSL"), False)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "amma09111998@gmail.com")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "efwd vlvl nbwo jmea")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@example.com")

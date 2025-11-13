@@ -1,6 +1,8 @@
 """
 Servicios de lógica de negocio para gestión de contraseñas
 """
+from urllib.parse import urljoin
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.contrib.auth.hashers import make_password
@@ -21,19 +23,24 @@ def create_password_reset_token(user):
     return PasswordResetToken.objects.create(user=user)
 
 
-def send_password_reset_email(user, token, frontend_url="http://localhost:5173"):
+def send_password_reset_email(user, token, frontend_url=None):
     """
     Envía un email con el enlace para restablecer la contraseña.
 
     Args:
         user: Instancia de CustomUser
         token: Token de restablecimiento
-        frontend_url: URL base del frontend (opcional)
+        frontend_url: URL base del frontend (opcional, por defecto settings.FRONTEND_BASE_URL)
 
     Returns:
         bool: True si el email se envió correctamente
     """
-    reset_link = f"{frontend_url}/reset-password/?token={token.token}"
+    base_frontend_url = (
+        frontend_url
+        or getattr(settings, "FRONTEND_BASE_URL", "https://tr7p.es")
+    ).rstrip("/")
+    reset_path = f"reset-password/?token={token.token}"
+    reset_link = urljoin(f"{base_frontend_url}/", reset_path)
 
     try:
         print(
