@@ -15,6 +15,7 @@ from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 from users.common.services import get_user_empresa
 from users.common.exceptions import EmpresaProfileNotFoundError
 from users.common.validators import validate_dni_nie_nif, normalize_documento
+from users.email.services import send_welcome_email
 
 EXENCION_7P_MAXIMA = Decimal('60100.00')
 
@@ -115,6 +116,8 @@ def create_empresa(data: Dict) -> EmpresaProfile:
         correo_contacto=data["correo_contacto"],
         permisos=data.get("permisos", False)
     )
+
+    transaction.on_commit(lambda: send_welcome_email(user, "empresa"))
 
     return empresa
 
@@ -224,6 +227,8 @@ def create_empleado(
         dni=dni_normalized,  # Guardar DNI normalizado
         salario=salario
     )
+
+    transaction.on_commit(lambda: send_welcome_email(user, password))
 
     return empleado
 

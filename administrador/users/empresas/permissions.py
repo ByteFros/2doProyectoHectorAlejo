@@ -148,7 +148,7 @@ class CanViewPendingReviews(permissions.BasePermission):
     Permite ver viajes/empleados con revisiones pendientes.
 
     - MASTER: Puede ver todos los pendientes
-    - EMPRESA con permisos=True: Puede ver pendientes de sus empleados
+    - EMPRESA: Puede ver pendientes de sus empleados (independiente de autogestión)
     - EMPRESA sin permisos: No puede ver (403)
     - EMPLEADO: No puede ver (403)
 
@@ -167,12 +167,12 @@ class CanViewPendingReviews(permissions.BasePermission):
         if request.user.role == "MASTER":
             return True
 
-        # EMPRESA solo si tiene permisos
+        # EMPRESA siempre puede ver (la edición sigue controlada por otros permisos)
         if request.user.role == "EMPRESA":
             empresa = get_user_empresa(request.user)
             if not empresa:
                 return False
-            return empresa.permisos
+            return True
 
         # EMPLEADO no puede ver
         return False

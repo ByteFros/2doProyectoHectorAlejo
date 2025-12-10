@@ -9,6 +9,11 @@ from datetime import timedelta
 from django.conf import settings
 
 
+def password_reset_token_expiration_default():
+    """Retorna la expiración por defecto (ahora + 1h)."""
+    return now() + timedelta(hours=1)
+
+
 class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ('MASTER', 'Master'),
@@ -101,12 +106,12 @@ class PasswordResetToken(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     token = models.UUIDField(default=uuid.uuid4, unique=True)  # Genera un token único
     created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(default= now() + timedelta(hours=1))
+    expires_at = models.DateTimeField(default=password_reset_token_expiration_default)
 
     def save(self,*args, **kwargs):
         """este token tendra 1 hora de validez"""
         if not self.expires_at:
-            self.expires_at = now() + timedelta(hours=1)
+            self.expires_at = password_reset_token_expiration_default()
         super().save(*args, **kwargs)
 
     def is_valid(self):

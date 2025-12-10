@@ -1,6 +1,8 @@
 """
 Tests para el módulo de autenticación
 """
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -221,6 +223,56 @@ class AuthenticationTestCase(TestCase):
         self.assertFalse(empresa.permisos)
 
         self.authenticate()
+
+    def test_register_empresa_sends_welcome_email(self):
+        """Test: Registro de EMPRESA dispara email de bienvenida con contraseña explícita"""
+        self.authenticate(self.master_access)
+        url = reverse('register')
+        data = {
+            'username': 'empresa_email',
+            'email': 'welcome@empresa.com',
+            'password': 'password123',
+            'role': 'EMPRESA',
+            'nombre_empresa': 'Empresa Email',
+            'nif': 'B12349876',
+            'correo_contacto': 'welcome@empresa.com'
+        }
+
+        with patch('users.authentication.serializers.send_welcome_email') as mock_send, \
+             patch('users.authentication.serializers.transaction.on_commit') as mock_on_commit:
+            mock_on_commit.side_effect = lambda func, using=None: func()
+            response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        self.assertEqual(args[0].email, 'welcome@empresa.com')
+        self.assertEqual(args[1], 'password123')
+
+    def test_register_empleado_sends_welcome_email_with_default_password(self):
+        """Test: Registro de EMPLEADO usa password por defecto y envía email"""
+        self.authenticate(self.master_access)
+        url = reverse('register')
+        data = {
+            'username': 'empleado_email',
+            'email': 'welcome@empleado.com',
+            'role': 'EMPLEADO',
+            'nombre': 'Empleado',
+            'apellido': 'Bienvenida',
+            'empresa_id': self.empresa_profile.id,
+            'dni': '44556677P'
+        }
+
+        with patch('users.authentication.serializers.send_welcome_email') as mock_send, \
+             patch('users.authentication.serializers.transaction.on_commit') as mock_on_commit:
+            mock_on_commit.side_effect = lambda func, using=None: func()
+            response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        self.assertEqual(args[0].email, 'welcome@empleado.com')
+        self.assertEqual(args[1], 'empleado')
 
     def test_register_empresa_without_password_uses_default(self):
         self.authenticate(self.master_access)

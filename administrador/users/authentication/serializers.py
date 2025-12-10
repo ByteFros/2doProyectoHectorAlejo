@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
 from .services import build_auth_response
+from users.email.services import send_welcome_email
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -44,7 +45,10 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                   'nombre_empresa', 'nif', 'address', 'city', 'postal_code', 'correo_contacto',
                   'permisos', 'permisos_autogestion',
                   'nombre', 'apellido', 'empresa_id', 'dni', 'salario']
-        extra_kwargs = {'password': {'write_only': True, 'required': False}}
+        extra_kwargs = {
+            'password': {'write_only': True, 'required': False},
+            'username': {'required': False},
+        }
 
     def create(self, validated_data):
         role = validated_data.get('role')
@@ -54,11 +58,13 @@ class RegisterUserSerializer(serializers.ModelSerializer):
             permisos = permisos_autogestion
 
         if role == 'EMPRESA':
-            nif = validated_data.get('nif')
-            if not nif:
+            nif_raw = validated_data.get('nif')
+            if not nif_raw:
                 raise serializers.ValidationError({"nif": "Debe proporcionar un NIF para registrar la empresa."})
-            if EmpresaProfile.objects.filter(nif=nif).exists():
+            nif_normalized = re.sub(r'[^0-9A-Za-z]', '', nif_raw).upper()
+            if EmpresaProfile.objects.filter(nif=nif_normalized).exists():
                 raise serializers.ValidationError({"nif": "Ya existe una empresa con este NIF."})
+            validated_data['nif'] = nif_normalized
             empresa = None
             dni = None
 
@@ -94,8 +100,6 @@ class RegisterUserSerializer(serializers.ModelSerializer):
 
         username = validated_data.get('username') or validated_data['email']
         correo_contacto = validated_data.get('correo_contacto') or validated_data['email']
-        if role == 'EMPRESA' and validated_data.get('nif'):
-            validated_data['nif'] = re.sub(r'[^0-9A-Za-z]', '', validated_data['nif']).upper()
 
         with transaction.atomic():
             user = CustomUser.objects.create(
@@ -127,6 +131,8 @@ class RegisterUserSerializer(serializers.ModelSerializer):
                     dni=dni or None,
                     salario=salario
                 )
+
+            transaction.on_commit(lambda: send_welcome_email(user, password))
 
         return RegisterUserSerializer(user).data
 

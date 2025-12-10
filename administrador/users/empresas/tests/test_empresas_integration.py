@@ -5,6 +5,8 @@ Actualizado para usar endpoints RESTful con DRF Router
 import io
 from decimal import Decimal
 from datetime import date, timedelta
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
@@ -57,6 +59,31 @@ class EmpresaViewSetIntegrationTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(EmpresaProfile.objects.filter(nif="B12345678").exists())
         self.assertIn('nombre_empresa', response.data)
+
+    def test_create_empresa_envia_email_bienvenida(self):
+        """Test POST /empresas/ envía correo de bienvenida con contraseña por defecto"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
+
+        data = {
+            "nombre_empresa": "Correo SA",
+            "nif": "B98765432",
+            "correo_contacto": "correo@empresa.com",
+            "address": "Calle Correo 1",
+            "city": "Madrid",
+            "postal_code": "28001",
+            "permisos": False
+        }
+
+        with patch('users.empresas.services.send_welcome_email') as mock_send, \
+             patch('users.empresas.services.transaction.on_commit') as mock_on_commit:
+            mock_on_commit.side_effect = lambda func, using=None: func()
+            response = self.client.post(f'{API_BASE_URL}/empresas/', data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        self.assertEqual(args[0].email, 'correo@empresa.com')
+        self.assertEqual(args[1], 'empresa')
 
     def test_create_empresa_con_nif_invalido(self):
         """Test POST /empresas/ - Crear empresa con NIF inválido"""
@@ -344,6 +371,28 @@ class EmpleadoViewSetIntegrationTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(EmpleadoProfile.objects.filter(dni="12345678Z").exists())
         self.assertEqual(response.data['salario'], '25000.50')
+
+    def test_create_empleado_envia_email_bienvenida(self):
+        """Test POST /empleados/ envía correo de bienvenida con password por defecto"""
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.empresa_token}')
+
+        data = {
+            "nombre": "Nuevo",
+            "apellido": "Empleado",
+            "dni": "12345678Z",
+            "email": "nuevo.empleado@test.com"
+        }
+
+        with patch('users.empresas.services.send_welcome_email') as mock_send, \
+             patch('users.empresas.services.transaction.on_commit') as mock_on_commit:
+            mock_on_commit.side_effect = lambda func, using=None: func()
+            response = self.client.post(f'{API_BASE_URL}/empleados/', data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_send.assert_called_once()
+        args, _ = mock_send.call_args
+        self.assertEqual(args[0].email, 'nuevo.empleado@test.com')
+        self.assertEqual(args[1], 'empleado')
 
     def test_create_empleado_con_dni_invalido(self):
         """Test POST /empleados/ - DNI inválido"""

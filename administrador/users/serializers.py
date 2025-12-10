@@ -186,7 +186,7 @@ class GastoSerializer(serializers.ModelSerializer):
             # Ignorar identificadores que puedan venir desde el cliente
             for field in ('viaje_id', 'empresa_id', 'empleado_id'):
                 validated_data.pop(field, None)
-            allowed_fields = {"comprobante"}
+            allowed_fields = {"comprobante", "monto", "concepto", "descripcion", "fecha_gasto"}
             invalid_fields = [field for field in validated_data.keys() if field not in allowed_fields]
             if invalid_fields:
                 raise serializers.ValidationError({
