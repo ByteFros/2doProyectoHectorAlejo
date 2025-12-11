@@ -149,13 +149,7 @@ class CanViewPendingReviews(permissions.BasePermission):
 
     - MASTER: Puede ver todos los pendientes
     - EMPRESA: Puede ver pendientes de sus empleados (independiente de autogestión)
-    - EMPRESA sin permisos: No puede ver (403)
     - EMPLEADO: No puede ver (403)
-
-    Usage:
-        @action(detail=False, permission_classes=[CanViewPendingReviews])
-        def pending(self, request):
-            # ...
     """
     message = "No tienes permisos para ver revisiones pendientes"
 
