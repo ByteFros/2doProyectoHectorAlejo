@@ -1,30 +1,41 @@
 """
 Vistas para gestión de mensajería (conversaciones entre usuarios)
 """
-import os
 import mimetypes
-from typing import Optional
+import os
 
+from django.conf import settings
 from django.db.models import Prefetch
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import status, generics
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from django.conf import settings
+from rest_framework import generics, status
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import Conversacion, ConversacionLectura, CustomUser, Mensaje, EmpresaProfile, EmpleadoProfile
-from users.serializers import ConversacionSerializer, MensajeSerializer
-from users.common.exceptions import UnauthorizedAccessError, EmpresaProfileNotFoundError, EmpleadoProfileNotFoundError
-from users.common.services import get_user_empresa, get_user_empleado
+from users.common.exceptions import (
+    EmpleadoProfileNotFoundError,
+    EmpresaProfileNotFoundError,
+    UnauthorizedAccessError,
+)
 from users.common.files import compress_if_image
+from users.common.services import get_user_empleado, get_user_empresa
+from users.models import (
+    Conversacion,
+    ConversacionLectura,
+    CustomUser,
+    EmpleadoProfile,
+    EmpresaProfile,
+    Mensaje,
+)
+from users.serializers import ConversacionSerializer, MensajeSerializer
+
 from .utils import (
-    get_target_user_or_400,
-    get_existing_conversation,
     create_conversation,
+    get_existing_conversation,
+    get_target_user_or_400,
     mark_conversation_as_read,
 )
 
@@ -79,7 +90,7 @@ class ContactListView(APIView):
 
         return Response(data, status=status.HTTP_200_OK)
 
-    def _format_user(self, user: CustomUser, display_name: Optional[str] = None, extra: Optional[dict] = None):
+    def _format_user(self, user: CustomUser, display_name: str | None = None, extra: dict | None = None):
         full_name = (user.get_full_name() or "").strip()
         display = display_name or full_name or user.username
         payload = {

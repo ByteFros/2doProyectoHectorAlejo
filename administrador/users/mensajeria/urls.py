@@ -2,14 +2,15 @@
 URLs del módulo de mensajería
 """
 from django.urls import path
+
 from .views import (
-    ContactListView,
     AdminContactView,
+    ContactListView,
     CrearConversacionView,
+    DescargarAdjuntoMensajeView,
+    EnviarMensajeView,
     ListarConversacionesView,
     ListarMensajesByIdView,
-    EnviarMensajeView,
-    DescargarAdjuntoMensajeView
 )
 
 urlpatterns = [

@@ -2,31 +2,33 @@
 Servicios comunes reutilizables para toda la aplicación
 Incluye lógica de filtrado jerárquico y obtención de perfiles
 """
+from collections.abc import Iterable
 from datetime import timedelta
-from typing import Optional, Tuple, Iterable, NamedTuple
+from typing import Any, NamedTuple
+
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
 from django.utils.formats import date_format
+
 from users.models import (
     CustomUser,
-    EmpresaProfile,
-    EmpleadoProfile,
-    Viaje,
     DiaViaje,
-    Gasto,
-    ViajeReviewSnapshot,
     DiaViajeReviewSnapshot,
+    EmpleadoProfile,
+    EmpresaProfile,
+    Gasto,
     GastoReviewSnapshot,
     Notificacion,
+    Viaje,
+    ViajeReviewSnapshot,
 )
-
 
 # ============================================================================
 # OBTENCIÓN DE PERFILES
 # ============================================================================
 
-def get_user_empresa(user: CustomUser) -> Optional[EmpresaProfile]:
+def get_user_empresa(user: CustomUser) -> EmpresaProfile | None:
     """
     Obtiene el perfil de empresa de un usuario.
 
@@ -47,7 +49,7 @@ def get_user_empresa(user: CustomUser) -> Optional[EmpresaProfile]:
         return None
 
 
-def get_user_empleado(user: CustomUser) -> Optional[EmpleadoProfile]:
+def get_user_empleado(user: CustomUser) -> EmpleadoProfile | None:
     """
     Obtiene el perfil de empleado de un usuario.
 
@@ -68,7 +70,7 @@ def get_user_empleado(user: CustomUser) -> Optional[EmpleadoProfile]:
         return None
 
 
-def get_user_profile(user: CustomUser) -> Tuple[Optional[EmpresaProfile], Optional[EmpleadoProfile]]:
+def get_user_profile(user: CustomUser) -> tuple[EmpresaProfile | None, EmpleadoProfile | None]:
     """
     Obtiene ambos perfiles de usuario (empresa y empleado).
 
@@ -134,8 +136,7 @@ def filter_queryset_by_role(
             return queryset.none()  # Sin perfil, devuelve vacío
 
         # Filtrar por empresa usando el campo especificado
-        filter_kwargs = {empresa_field: empresa}
-        return queryset.filter(**filter_kwargs)
+        return queryset.filter(**{empresa_field: empresa})
 
     elif user.role == "EMPLEADO":
         empleado = get_user_empleado(user)
@@ -143,8 +144,7 @@ def filter_queryset_by_role(
             return queryset.none()  # Sin perfil, devuelve vacío
 
         # Filtrar por empleado usando el campo especificado
-        filter_kwargs = {empleado_field: empleado}
-        return queryset.filter(**filter_kwargs)
+        return queryset.filter(**{empleado_field: empleado})
 
     else:
         raise ValueError(f"Rol de usuario no reconocido: {user.role}")
@@ -209,11 +209,11 @@ def can_access_empresa(user: CustomUser, empresa: EmpresaProfile) -> bool:
 
     if user.role == "EMPRESA":
         user_empresa = get_user_empresa(user)
-        return user_empresa and user_empresa.id == empresa.id
+        return bool(user_empresa and user_empresa.id == empresa.id)
 
     if user.role == "EMPLEADO":
         empleado = get_user_empleado(user)
-        return empleado and empleado.empresa.id == empresa.id
+        return bool(empleado and empleado.empresa.id == empresa.id)
 
     return False
 
@@ -239,11 +239,11 @@ def can_access_empleado(user: CustomUser, empleado: EmpleadoProfile) -> bool:
 
     if user.role == "EMPRESA":
         user_empresa = get_user_empresa(user)
-        return user_empresa and empleado.empresa.id == user_empresa.id
+        return bool(user_empresa and empleado.empresa.id == user_empresa.id)
 
     if user.role == "EMPLEADO":
         user_empleado = get_user_empleado(user)
-        return user_empleado and user_empleado.id == empleado.id
+        return bool(user_empleado and user_empleado.id == empleado.id)
 
     return False
 
@@ -269,11 +269,11 @@ def can_manage_viaje(user: CustomUser, viaje) -> bool:
 
     if user.role == "EMPRESA":
         user_empresa = get_user_empresa(user)
-        return user_empresa and viaje.empresa.id == user_empresa.id
+        return bool(user_empresa and viaje.empresa.id == user_empresa.id)
 
     if user.role == "EMPLEADO":
         user_empleado = get_user_empleado(user)
-        return user_empleado and viaje.empleado.id == user_empleado.id
+        return bool(user_empleado and viaje.empleado.id == user_empleado.id)
 
     return False
 
@@ -282,7 +282,7 @@ def can_manage_viaje(user: CustomUser, viaje) -> bool:
 # HELPERS DE VALIDACIÓN
 # ============================================================================
 
-def validate_user_has_empresa_profile(user: CustomUser) -> Tuple[bool, Optional[str]]:
+def validate_user_has_empresa_profile(user: CustomUser) -> tuple[bool, str | None]:
     """
     Valida que el usuario tenga perfil de empresa.
 
@@ -307,7 +307,7 @@ def validate_user_has_empresa_profile(user: CustomUser) -> Tuple[bool, Optional[
     return True, None
 
 
-def validate_user_has_empleado_profile(user: CustomUser) -> Tuple[bool, Optional[str]]:
+def validate_user_has_empleado_profile(user: CustomUser) -> tuple[bool, str | None]:
     """
     Valida que el usuario tenga perfil de empleado.
 
@@ -459,7 +459,7 @@ def sync_company_review_notification(
     empresa: EmpresaProfile,
     *,
     limit_datetime=None
-) -> Optional[Notificacion]:
+) -> Notificacion | None:
     """
     Crea o actualiza la notificación de fecha límite de revisión.
     """
@@ -532,7 +532,7 @@ def ensure_company_is_up_to_date(
 
 
 class VisibleViajesResult(NamedTuple):
-    queryset: QuerySet
+    queryset: QuerySet[Any]
     uses_snapshot: bool
 
 
@@ -541,21 +541,21 @@ def get_visible_viajes_queryset(user: CustomUser) -> VisibleViajesResult:
     Retorna el queryset de viajes visible según el rol del usuario.
     """
     if user.role == "MASTER":
-        qs = Viaje.objects.all()
-        return VisibleViajesResult(qs, uses_snapshot=False)
+        master_qs: QuerySet[Any] = Viaje.objects.all()
+        return VisibleViajesResult(master_qs, uses_snapshot=False)
 
     if user.role == "EMPRESA":
         empresa = get_user_empresa(user)
         if not empresa:
             return VisibleViajesResult(ViajeReviewSnapshot.objects.none(), uses_snapshot=True)
         ensure_company_is_up_to_date(empresa)
-        qs = (
+        empresa_qs: QuerySet[Any] = (
             ViajeReviewSnapshot.objects
             .filter(empresa=empresa)
             .select_related("empleado", "empleado__user", "empresa", "empresa__user", "viaje")
             .prefetch_related("dias_snapshot", "gastos_snapshot", "gastos_snapshot__gasto")
         )
-        return VisibleViajesResult(qs, uses_snapshot=True)
+        return VisibleViajesResult(empresa_qs, uses_snapshot=True)
 
     if user.role == "EMPLEADO":
         empleado = get_user_empleado(user)
@@ -563,13 +563,13 @@ def get_visible_viajes_queryset(user: CustomUser) -> VisibleViajesResult:
             return VisibleViajesResult(ViajeReviewSnapshot.objects.none(), uses_snapshot=True)
         empresa = empleado.empresa
         ensure_company_is_up_to_date(empresa)
-        qs = (
+        empleado_qs: QuerySet[Any] = (
             ViajeReviewSnapshot.objects
             .filter(empresa=empresa, empleado=empleado)
             .select_related("empleado", "empleado__user", "empresa", "empresa__user", "viaje")
             .prefetch_related("dias_snapshot", "gastos_snapshot", "gastos_snapshot__gasto")
         )
-        return VisibleViajesResult(qs, uses_snapshot=True)
+        return VisibleViajesResult(empleado_qs, uses_snapshot=True)
 
     raise ValueError(f"Rol de usuario no reconocido: {user.role}")
 

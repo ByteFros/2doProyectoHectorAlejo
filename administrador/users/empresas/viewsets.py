@@ -4,52 +4,50 @@ Usa lógica de negocio de common/services y permissions personalizados.
 """
 from collections import defaultdict
 from datetime import timedelta
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from decimal import Decimal
+
 from django.db.models import Prefetch
 from django.utils import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import EmpresaProfile, EmpleadoProfile, Viaje, DiaViaje
-from users.serializers import EmpresaProfileSerializer, EmpleadoProfileSerializer
-from users.common.services import (
-    filter_queryset_by_empresa,
-    get_user_empresa,
-    get_periodicity_delta,
-    sync_company_review_notification,
-    ensure_company_is_up_to_date,
-)
 from users.common.exceptions import EmpresaProfileNotFoundError
+from users.common.services import (
+    ensure_company_is_up_to_date,
+    filter_queryset_by_empresa,
+    get_periodicity_delta,
+    get_user_empresa,
+    sync_company_review_notification,
+)
+from users.models import DiaViaje, EmpleadoProfile, EmpresaProfile, Viaje
+from users.serializers import EmpleadoProfileSerializer, EmpresaProfileSerializer
 
+from .permissions import (
+    CanAccessEmpleado,
+    CanAccessEmpresa,
+    CanManageEmpleados,
+    CanViewPendingReviews,
+    IsMaster,
+)
 from .serializers import (
-    EmpresaCreateSerializer,
-    EmpleadoCreateSerializer,
     BatchEmployeeUploadSerializer,
+    EmpleadoCreateSerializer,
+    EmpleadoWithViajesSerializer,
+    EmpresaCreateSerializer,
     EmpresaUpdatePermissionsSerializer,
     EmpresaWithEmpleadosSerializer,
-    EmpleadoWithViajesSerializer
 )
 from .services import (
-    create_empresa,
-    update_empresa_permissions,
-    delete_empresa,
-    create_empleado,
-    delete_empleado,
-    process_employee_csv,
-    calcular_exencion_7p_por_dias,
     calcular_exencion_7p_total,
-)
-from .permissions import (
-    IsMaster,
-    IsMasterOrEmpresa,
-    CanAccessEmpresa,
-    CanAccessEmpleado,
-    CanManageEmpleados,
-    CanViewPendingReviews
+    create_empleado,
+    create_empresa,
+    delete_empleado,
+    delete_empresa,
+    process_employee_csv,
+    update_empresa_permissions,
 )
 
 
@@ -128,6 +126,8 @@ class EmpresaViewSet(viewsets.ModelViewSet):
                 output_serializer.data,
                 status=status.HTTP_201_CREATED
             )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response(
                 {"error": str(e)},
@@ -330,6 +330,8 @@ class EmpleadoViewSet(viewsets.ModelViewSet):
                 output_serializer.data,
                 status=status.HTTP_201_CREATED
             )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response(
                 {"error": str(e)},

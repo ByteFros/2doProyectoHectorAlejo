@@ -11,7 +11,7 @@ class DebugMiddleware:
     def __call__(self, request):
         # Log TODAS las peticiones a /api/users/empresas/
         if '/api/users/empresas/' in request.path:
-            print(f"🔧 [MIDDLEWARE] ===== REQUEST START =====")
+            print("🔧 [MIDDLEWARE] ===== REQUEST START =====")
             print(f"🔧 [MIDDLEWARE] Path: {request.path}")
             print(f"🔧 [MIDDLEWARE] Method: {request.method}")
             print(f"🔧 [MIDDLEWARE] Content-Type: {request.content_type}")
@@ -36,8 +36,9 @@ class DebugMiddleware:
                     content = response.content.decode('utf-8')
                     if len(content) < 500:  # Solo para respuestas cortas
                         print(f"🔧 [MIDDLEWARE] Response content: {content}")
-                except:
+                except UnicodeDecodeError:
+                    # Algunas respuestas pueden no ser texto; ignoramos el contenido en ese caso.
                     pass
-            print(f"🔧 [MIDDLEWARE] ===== REQUEST END =====")
+            print("🔧 [MIDDLEWARE] ===== REQUEST END =====")
         
         return response

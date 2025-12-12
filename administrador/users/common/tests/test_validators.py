@@ -5,15 +5,15 @@ from django.test import TestCase
 from rest_framework import serializers
 
 from users.common.validators import (
+    normalize_documento,
     validate_dni_format,
-    validate_nie_format,
-    validate_nif_format,
     validate_dni_nie_nif,
-    validate_dni_serializer,
-    validate_nie_serializer,
-    validate_nif_serializer,
     validate_dni_nie_nif_serializer,
-    normalize_documento
+    validate_dni_serializer,
+    validate_nie_format,
+    validate_nie_serializer,
+    validate_nif_format,
+    validate_nif_serializer,
 )
 
 

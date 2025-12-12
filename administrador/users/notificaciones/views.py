@@ -4,12 +4,12 @@ Vistas para gestión de notificaciones
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import Notificacion, EmpresaProfile
+from users.models import EmpresaProfile, Notificacion
 from users.serializers import NotificacionSerializer
 
 User = get_user_model()

@@ -3,14 +3,13 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from users.common.exceptions import UnauthorizedAccessError
 from users.models import (
     Conversacion,
     ConversacionLectura,
     CustomUser,
     EmpresaProfile,
-    EmpleadoProfile,
 )
-from users.common.exceptions import UnauthorizedAccessError
 
 
 def get_target_user_or_400(user: CustomUser, target_user_id: int) -> CustomUser:

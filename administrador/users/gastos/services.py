@@ -1,13 +1,14 @@
 """
 Servicios de lógica de negocio para gastos
 """
-from typing import Dict, Optional
-from django.core.files.uploadedfile import UploadedFile
-from django.conf import settings
-from users.models import Gasto, EmpleadoProfile, EmpresaProfile, Viaje
-from users.common.services import mark_company_review_pending
-from users.common.files import compress_if_image
 
+from django.conf import settings
+from django.core.files.uploadedfile import UploadedFile
+from django.db.models import QuerySet
+
+from users.common.files import compress_if_image
+from users.common.services import mark_company_review_pending
+from users.models import EmpleadoProfile, EmpresaProfile, Gasto, Viaje
 
 # ============================================================================
 # VALIDACIONES
@@ -45,13 +46,13 @@ def validar_estado_gasto(estado: str) -> None:
 # SERVICIOS DE GASTOS
 # ============================================================================
 
-FILE_UPLOAD_LIMIT = getattr(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024)
+FILE_UPLOAD_LIMIT: int = int(getattr(settings, "FILE_UPLOAD_MAX_MEMORY_SIZE", 10 * 1024 * 1024) or 10 * 1024 * 1024)
 
 
-def _prepare_comprobante(comprobante: Optional[UploadedFile]):
+def _prepare_comprobante(comprobante: UploadedFile | None):
     if not comprobante:
         return None
-    if comprobante.size > FILE_UPLOAD_LIMIT:
+    if comprobante.size and comprobante.size > FILE_UPLOAD_LIMIT:
         raise ValueError("El comprobante supera el límite permitido (10 MB).")
     return compress_if_image(comprobante, prefer_detail=True).file
 
@@ -61,8 +62,8 @@ def crear_gasto(
     viaje: Viaje,
     concepto: str,
     monto: float,
-    fecha_gasto: str = None,
-    comprobante: Optional[UploadedFile] = None,
+    fecha_gasto: str | None = None,
+    comprobante: UploadedFile | None = None,
     descripcion: str = ""
 ) -> Gasto:
     """
@@ -89,28 +90,31 @@ def crear_gasto(
     # Crear gasto
     comprobante_file = _prepare_comprobante(comprobante)
 
-    gasto = Gasto.objects.create(
-        empleado=empleado,
-        empresa=empleado.empresa,
-        viaje=viaje,
-        concepto=concepto,
-        monto=monto,
-        fecha_gasto=fecha_gasto,
-        comprobante=comprobante_file,
-        descripcion=descripcion or "",
-        estado="PENDIENTE"
-    )
+    gasto_kwargs = {
+        "empleado": empleado,
+        "empresa": empleado.empresa,
+        "viaje": viaje,
+        "concepto": concepto,
+        "monto": monto,
+        "fecha_gasto": fecha_gasto,
+        "comprobante": comprobante_file,
+        "estado": "PENDIENTE",
+    }
+    if hasattr(Gasto, "descripcion"):
+        gasto_kwargs["descripcion"] = descripcion or ""
+
+    gasto = Gasto.objects.create(**gasto_kwargs)
 
     return gasto
 
 
 def actualizar_gasto(
     gasto: Gasto,
-    concepto: Optional[str] = None,
-    monto: Optional[float] = None,
-    fecha_gasto: Optional[str] = None,
-    comprobante: Optional[UploadedFile] = None,
-    descripcion: Optional[str] = None
+    concepto: str | None = None,
+    monto: float | None = None,
+    fecha_gasto: str | None = None,
+    comprobante: UploadedFile | None = None,
+    descripcion: str | None = None
 ) -> Gasto:
     """
     Actualiza un gasto existente.
@@ -134,7 +138,7 @@ def actualizar_gasto(
         gasto.fecha_gasto = fecha_gasto
     if comprobante is not None:
         gasto.comprobante = _prepare_comprobante(comprobante)
-    if descripcion is not None:
+    if descripcion is not None and hasattr(gasto, "descripcion"):
         gasto.descripcion = descripcion
 
     gasto.save()
@@ -223,14 +227,14 @@ def puede_modificar_gasto(usuario, gasto: Gasto) -> bool:
         True si puede modificar, False si no
     """
     # Solo el empleado dueño del gasto puede modificarlo
-    return gasto.empleado.user == usuario
+    return bool(gasto.empleado.user == usuario)
 
 
 # ============================================================================
 # QUERIES Y FILTROS
 # ============================================================================
 
-def obtener_gastos_por_rol(usuario) -> 'QuerySet[Gasto]':
+def obtener_gastos_por_rol(usuario) -> QuerySet[Gasto]:
     """
     Obtiene los gastos según el rol del usuario.
 
@@ -252,7 +256,7 @@ def obtener_gastos_por_rol(usuario) -> 'QuerySet[Gasto]':
     return Gasto.objects.none()
 
 
-def obtener_gastos_por_viaje(viaje: Viaje) -> 'QuerySet[Gasto]':
+def obtener_gastos_por_viaje(viaje: Viaje) -> QuerySet[Gasto]:
     """
     Obtiene todos los gastos de un viaje.
 
@@ -265,7 +269,7 @@ def obtener_gastos_por_viaje(viaje: Viaje) -> 'QuerySet[Gasto]':
     return Gasto.objects.filter(viaje=viaje)
 
 
-def obtener_gastos_pendientes(empresa: Optional[EmpresaProfile] = None) -> 'QuerySet[Gasto]':
+def obtener_gastos_pendientes(empresa: EmpresaProfile | None = None) -> QuerySet[Gasto]:
     """
     Obtiene gastos pendientes de aprobación.
 

@@ -2,14 +2,15 @@
 URLs del módulo de reportes y analytics
 """
 from django.urls import path
+
 from .views import (
     CompanyTripsSummaryView,
-    TripsPerMonthView,
-    TripsTypeView,
+    EmployeeTripsSummaryView,
     ExemptDaysView,
     GeneralInfoView,
-    EmployeeTripsSummaryView,
-    MasterCompanyEmployeesView
+    MasterCompanyEmployeesView,
+    TripsPerMonthView,
+    TripsTypeView,
 )
 
 urlpatterns = [

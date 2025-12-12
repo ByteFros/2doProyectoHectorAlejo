@@ -2,18 +2,19 @@
 URLs del módulo de viajes
 """
 from django.urls import path
+
 from .views import (
-    CrearViajeView,
-    ListarViajesRevisadosView,
-    PendingTripsByEmployeeView,
-    ListarTodosLosViajesView,
-    PendingTripsDetailView,
     CambiarEstadoViajeView,
-    EmployeeCityStatsView,
+    CrearViajeView,
+    DiaViajeBatchReviewView,
     DiaViajeListView,
     DiaViajeReviewView,
-    DiaViajeBatchReviewView,
-    ViajeDetailView
+    EmployeeCityStatsView,
+    ListarTodosLosViajesView,
+    ListarViajesRevisadosView,
+    PendingTripsByEmployeeView,
+    PendingTripsDetailView,
+    ViajeDetailView,
 )
 
 urlpatterns = [

@@ -4,11 +4,8 @@ Estos permissions son wrappers ligeros que reutilizan la lógica
 de negocio definida en users.common.services.
 """
 from rest_framework import permissions
-from users.common.services import (
-    can_access_empresa,
-    can_access_empleado,
-    get_user_empresa
-)
+
+from users.common.services import can_access_empleado, can_access_empresa, get_user_empresa
 
 
 class IsMaster(permissions.BasePermission):

@@ -1,6 +1,6 @@
-from django.urls import path, include
+from django.urls import include, path
 
-from .views import UserDetailView, EmployeeListView, EmpleadosPorEmpresaView
+from .views import UserDetailView
 
 urlpatterns = [
     # Autenticación - Módulo dedicado

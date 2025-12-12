@@ -1,7 +1,8 @@
 import os
 
 from django.core.management.base import BaseCommand
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
+
+from users.models import CustomUser, EmpleadoProfile, EmpresaProfile
 
 
 class Command(BaseCommand):

@@ -4,12 +4,11 @@ from io import BytesIO
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
-from PIL import Image
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Conversacion, Mensaje
-
+from users.models import Conversacion, CustomUser, EmpleadoProfile, EmpresaProfile, Mensaje
 
 API_BASE = '/api/users'
 

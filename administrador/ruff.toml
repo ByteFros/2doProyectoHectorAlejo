@@ -1,0 +1,14 @@
+target-version = "py312"
+line-length = 100
+# Evita revisar artefactos o entornos virtuales
+extend-exclude = ["migrations", ".venv", "venv", "__pycache__", "media"]
+
+[lint]
+# Básicos (flake8), imports ordenados, bugbear, upgrades de sintaxis y checks específicos de Django
+select = ["E", "F", "I", "B", "UP", "DJ"]
+# Si prefieres controlar las líneas largas más adelante, ignora E501 de momento
+ignore = ["E501"]
+
+[format]
+quote-style = "double"
+indent-style = "space"

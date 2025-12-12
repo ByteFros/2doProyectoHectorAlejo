@@ -5,24 +5,24 @@ import shutil
 import tempfile
 from datetime import date, timedelta
 from decimal import Decimal
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
-from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import (
-    EmpresaProfile,
     EmpleadoProfile,
-    Viaje,
-    DiaViaje,
+    EmpresaProfile,
     Gasto,
+    Viaje,
 )
 from users.viajes.services import (
-    crear_viaje,
     crear_dias_viaje,
+    crear_viaje,
     inicializar_dias_viaje_finalizado,
     procesar_revision_viaje,
 )
@@ -485,7 +485,7 @@ class EliminarViajeViewTest(TestCase):
             password="pass",
             role="EMPLEADO"
         )
-        otro_empleado = EmpleadoProfile.objects.create(
+        EmpleadoProfile.objects.create(
             user=otro_user,
             empresa=self.empresa,
             nombre="Ana",

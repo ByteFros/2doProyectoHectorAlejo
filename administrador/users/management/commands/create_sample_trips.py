@@ -4,6 +4,7 @@ Genera viajes en estado EN_REVISION con destinos reales (sin gastos).
 """
 import random
 from datetime import date, timedelta
+
 from django.core.management.base import BaseCommand
 
 from users.models import EmpleadoProfile, Viaje

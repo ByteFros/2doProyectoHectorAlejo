@@ -1,14 +1,13 @@
 """
 Servicio genérico para envío de emails SMTP reutilizable en el proyecto.
 """
-from typing import Iterable, List
-from urllib.parse import urljoin
+from collections.abc import Iterable
 
 from django.conf import settings
 from django.core.mail import send_mail
 
 
-def _normalize_recipients(recipients: Iterable[str]) -> List[str]:
+def _normalize_recipients(recipients: Iterable[str]) -> list[str]:
     """Convierte destinatarios en lista y limpia vacíos."""
     if not recipients:
         return []
@@ -73,7 +72,8 @@ def send_welcome_email(user, password: str, frontend_url: str | None = None) -> 
     Returns:
         bool: True si el email se envió correctamente
     """
-    base_url = (frontend_url or getattr(settings, "FRONTEND_BASE_URL", "https://tr7p.es")).rstrip("/")
+    base_url_raw = frontend_url or getattr(settings, "FRONTEND_BASE_URL", "https://tr7p.es") or "https://tr7p.es"
+    base_url = str(base_url_raw).rstrip("/")
     # El login vive en la raíz del frontend
     login_link = f"{base_url}/"
 

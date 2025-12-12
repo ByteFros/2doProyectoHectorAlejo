@@ -1,28 +1,28 @@
 """Vistas para autenticación de usuarios."""
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import RegisterUserSerializer, CustomTokenObtainPairSerializer
+from .serializers import CustomTokenObtainPairSerializer, RegisterUserSerializer
 from .services import build_session_response
 
 
 class LoginView(TokenObtainPairView):
     """Entrega pares access/refresh junto con los metadatos del usuario."""
 
-    permission_classes = [AllowAny]
+    permission_classes = (AllowAny,)  # type: ignore[assignment]
     serializer_class = CustomTokenObtainPairSerializer
 
 
 class LogoutView(APIView):
     """Invalida el refresh token recibido (requiere blacklist habilitado)."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes: tuple[type[BasePermission], ...] = (IsAuthenticated,)
 
     def post(self, request):
         refresh_token = request.data.get("refresh")
@@ -47,7 +47,7 @@ class LogoutView(APIView):
 class RegisterUserView(APIView):
     """Registra nuevos usuarios controlando el rol del solicitante."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes: tuple[type[BasePermission], ...] = (IsAuthenticated,)
 
     def post(self, request):
         actor = request.user

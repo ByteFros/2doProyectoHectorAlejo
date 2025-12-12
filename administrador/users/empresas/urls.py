@@ -1,10 +1,10 @@
 """
 URLs del módulo de empresas y empleados usando DRF Routers
 """
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .viewsets import EmpresaViewSet, EmpleadoViewSet
+from .viewsets import EmpleadoViewSet, EmpresaViewSet
 
 # Crear router y registrar ViewSets
 router = DefaultRouter()

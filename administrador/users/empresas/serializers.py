@@ -2,9 +2,9 @@
 Serializers para el módulo de empresas y empleados
 """
 from rest_framework import serializers
-from users.models import EmpresaProfile, EmpleadoProfile, CustomUser, Viaje
-from users.common.validators import validate_dni_nie_nif_serializer, validate_nif_serializer
 
+from users.common.validators import validate_dni_nie_nif_serializer, validate_nif_serializer
+from users.models import CustomUser, EmpleadoProfile, EmpresaProfile, Viaje
 
 # ==================== SERIALIZERS ANIDADOS PARA 'include' ====================
 
@@ -79,7 +79,7 @@ class EmpleadoWithViajesSerializer(serializers.ModelSerializer):
 class EmpresaCreateSerializer(serializers.Serializer):
     """Serializer para crear empresa"""
     nombre_empresa = serializers.CharField(max_length=255, required=True)
-    nif = serializers.CharField(max_length=50, required=True, validators=[validate_nif_serializer])
+    nif = serializers.CharField(max_length=50, required=True)
     address = serializers.CharField(max_length=255, required=False, allow_blank=True)
     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     postal_code = serializers.CharField(max_length=10, required=False, allow_blank=True)
@@ -88,8 +88,8 @@ class EmpresaCreateSerializer(serializers.Serializer):
 
     def validate_nif(self, value):
         """Validar que el NIF no esté duplicado"""
+        value_normalized = validate_nif_serializer(value)
         # Normalizar para comparación (el validator ya lo normaliza)
-        value_normalized = value.upper().strip()
         if EmpresaProfile.objects.filter(nif=value_normalized).exists():
             raise serializers.ValidationError("El NIF ya está registrado en la BBDD")
         return value_normalized
@@ -105,7 +105,7 @@ class EmpleadoCreateSerializer(serializers.Serializer):
     """Serializer para crear empleado individual"""
     nombre = serializers.CharField(max_length=255, required=True)
     apellido = serializers.CharField(max_length=255, required=True)
-    dni = serializers.CharField(max_length=20, required=True, validators=[validate_dni_nie_nif_serializer])
+    dni = serializers.CharField(max_length=20, required=True)
     email = serializers.EmailField(required=True)  # Ahora es obligatorio
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, default="empleado")
@@ -113,8 +113,8 @@ class EmpleadoCreateSerializer(serializers.Serializer):
 
     def validate_dni(self, value):
         """Validar que el DNI/NIE/NIF no esté duplicado"""
+        value_normalized = validate_dni_nie_nif_serializer(value)
         # Normalizar para comparación (el validator ya lo normaliza)
-        value_normalized = value.upper().strip()
         if EmpleadoProfile.objects.filter(dni=value_normalized).exists():
             raise serializers.ValidationError("El DNI/NIE ya está asociado a un empleado")
         return value_normalized

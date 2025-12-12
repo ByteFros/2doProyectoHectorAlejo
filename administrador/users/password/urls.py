@@ -2,11 +2,8 @@
 URLs del módulo de gestión de contraseñas
 """
 from django.urls import path
-from .views import (
-    PasswordResetRequestView,
-    PasswordResetConfirmView,
-    ChangePasswordView
-)
+
+from .views import ChangePasswordView, PasswordResetConfirmView, PasswordResetRequestView
 
 urlpatterns = [
     path('password-reset-request/', PasswordResetRequestView.as_view(), name='password_reset_request'),

@@ -1,5 +1,7 @@
 from django.core.management.base import BaseCommand
+
 from users.models import CustomUser
+
 
 class Command(BaseCommand):
     help = "Crea un usuario MASTER por defecto"

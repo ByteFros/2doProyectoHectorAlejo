@@ -3,19 +3,17 @@ Servicios de lógica de negocio para empresas y empleados
 """
 import calendar
 import csv
-import io
 import random
 import string
-from collections import defaultdict
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Dict, List, Optional
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+
 from django.db import transaction
+from django.db.models import QuerySet
 from django.utils.text import slugify
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile
-from users.common.services import get_user_empresa
-from users.common.exceptions import EmpresaProfileNotFoundError
-from users.common.validators import validate_dni_nie_nif, normalize_documento
+
+from users.common.validators import normalize_documento, validate_dni_nie_nif
 from users.email.services import send_welcome_email
+from users.models import CustomUser, EmpleadoProfile, EmpresaProfile
 
 EXENCION_7P_MAXIMA = Decimal('60100.00')
 
@@ -72,7 +70,7 @@ def generate_employee_email(nombre: str, apellido: str, nombre_empresa: str) -> 
 # SERVICIOS DE EMPRESAS
 # ============================================================================
 
-def create_empresa(data: Dict) -> EmpresaProfile:
+def create_empresa(data: dict) -> EmpresaProfile:
     """
     Crea una nueva empresa con su usuario asociado.
 
@@ -162,9 +160,9 @@ def create_empleado(
     apellido: str,
     dni: str,
     email: str,  # Ahora es obligatorio
-    username: str = None,
+    username: str | None = None,
     password: str = "empleado",
-    salario: Optional[Decimal] = None
+    salario: Decimal | None = None
 ) -> EmpleadoProfile:
     """
     Crea un nuevo empleado asociado a una empresa.
@@ -253,7 +251,7 @@ def delete_empleado(empleado: EmpleadoProfile) -> None:
 def process_employee_csv(
     empresa: EmpresaProfile,
     csv_file
-) -> Dict[str, List]:
+) -> dict[str, list]:
     """
     Procesa un archivo CSV y registra empleados en lote.
 
@@ -382,8 +380,8 @@ def process_employee_csv(
 
 
 def calcular_exencion_7p_por_dias(
-    salario_anual: Optional[Decimal],
-    dias_por_anio: Dict[int, int]
+    salario_anual: Decimal | None,
+    dias_por_anio: dict[int, int]
 ) -> Decimal:
     """Calcula el importe exento proporcional por año."""
 
@@ -404,8 +402,8 @@ def calcular_exencion_7p_por_dias(
 
 
 def calcular_exencion_7p_total(
-    salario_anual: Optional[Decimal],
-    dias_por_anio: Dict[int, int]
+    salario_anual: Decimal | None,
+    dias_por_anio: dict[int, int]
 ) -> Decimal:
     """Devuelve la exención total respetando el tope legal."""
 
@@ -419,7 +417,7 @@ def calcular_exencion_7p_total(
 # QUERIES ESPECIALES
 # ============================================================================
 
-def get_companies_with_pending_reviews() -> 'QuerySet[EmpresaProfile]':
+def get_companies_with_pending_reviews() -> QuerySet[EmpresaProfile]:
     """
     Obtiene empresas que tienen empleados con viajes en estado EN_REVISION, REABIERTO o REVISADO.
 
@@ -436,7 +434,7 @@ def get_companies_with_pending_reviews() -> 'QuerySet[EmpresaProfile]':
     ).distinct()
 
 
-def get_employees_with_pending_reviews(empresa: EmpresaProfile) -> 'QuerySet[EmpleadoProfile]':
+def get_employees_with_pending_reviews(empresa: EmpresaProfile) -> QuerySet[EmpleadoProfile]:
     """
     Obtiene empleados de una empresa que tienen viajes en estado EN_REVISION, REABIERTO o REVISADO.
 

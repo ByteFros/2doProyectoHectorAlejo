@@ -8,11 +8,11 @@ from rest_framework.test import APITestCase
 from users.common.services import ensure_company_is_up_to_date
 from users.models import (
     CustomUser,
-    EmpresaProfile,
-    EmpleadoProfile,
-    Viaje,
     DiaViaje,
+    EmpleadoProfile,
+    EmpresaProfile,
     Gasto,
+    Viaje,
 )
 
 

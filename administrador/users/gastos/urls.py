@@ -2,12 +2,13 @@
 URLs del módulo de gastos
 """
 from django.urls import path
+
 from .views import (
-    CrearGastoView,
     AprobarRechazarGastoView,
+    CrearGastoView,
+    GastoComprobanteDownloadView,
     GastoListView,
     GastoUpdateDeleteView,
-    GastoComprobanteDownloadView
 )
 
 urlpatterns = [

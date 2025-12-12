@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from io import BytesIO
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import Any, BinaryIO, cast
 
 from django.core.files.base import ContentFile, File
 from django.core.files.uploadedfile import UploadedFile
@@ -29,15 +29,15 @@ class ImageCompressionResult:
         self.optimized = optimized
 
 
-def _reset_stream(stream: BinaryIO) -> None:
+def _reset_stream(stream: BinaryIO | File[Any] | UploadedFile | BytesIO) -> None:
     if hasattr(stream, "seek"):
         stream.seek(0, os.SEEK_SET)
 
 
-def _read_bytes(upload: UploadedFile | File) -> bytes:
+def _read_bytes(upload: UploadedFile | File[Any]) -> bytes:
     """Lee el archivo completo (<=10 MB) y resetea el puntero."""
     _reset_stream(upload)
-    data = upload.read()
+    data = cast(bytes, upload.read())
     _reset_stream(upload)
     return data
 
@@ -90,7 +90,7 @@ def compress_if_image(
     detail_max_dimension: int = DETAIL_MAX_DIMENSION,
     prefer_detail: bool = False,
     quality: int = DEFAULT_QUALITY,
-    preferred_format: Optional[str] = None,
+    preferred_format: str | None = None,
 ) -> ImageCompressionResult:
     """
     Si el archivo es una imagen, la comprime/redimensiona y devuelve un ContentFile.
@@ -102,12 +102,14 @@ def compress_if_image(
 
     original_bytes = _read_bytes(uploaded_file)
     try:
-        image = Image.open(BytesIO(original_bytes))
+        image = cast(Image.Image, Image.open(BytesIO(original_bytes)))
     except UnidentifiedImageError:
         _reset_stream(uploaded_file)
         return ImageCompressionResult(uploaded_file, optimized=False)
 
-    image = ImageOps.exif_transpose(image)
+    transposed = ImageOps.exif_transpose(image)
+    if transposed is not None:
+        image = transposed
     target_dimension = detail_max_dimension if prefer_detail else max_dimension
     image.thumbnail((target_dimension, target_dimension), Image.Resampling.LANCZOS)
 
@@ -119,6 +121,6 @@ def compress_if_image(
         _reset_stream(uploaded_file)
         return ImageCompressionResult(uploaded_file, optimized=False)
 
-    new_name = _build_new_name(uploaded_file.name, fmt)
+    new_name = _build_new_name(uploaded_file.name or "upload", fmt)
     optimized_file = ContentFile(optimized_bytes, name=new_name)
     return ImageCompressionResult(optimized_file, optimized=True)

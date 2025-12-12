@@ -3,10 +3,11 @@ Comando de Django para cargar datos de prueba en la base de datos.
 Crea 2 empresas con 10 empleados cada una.
 """
 import random
+
 from django.core.management.base import BaseCommand
 
+from users.empresas.services import create_empleado, create_empresa
 from users.models import CustomUser, EmpresaProfile
-from users.empresas.services import create_empresa, create_empleado
 
 
 class Command(BaseCommand):
@@ -155,7 +156,7 @@ class Command(BaseCommand):
             }
 
             try:
-                empleado = create_empleado(empresa=empresa, **empleado_data)
+                create_empleado(empresa=empresa, **empleado_data)
                 empleados_creados += 1
                 self.stdout.write(
                     f'  ✓ {empleados_creados}/10 - {nombre} {apellido1} {apellido2} (DNI: {dni})'
@@ -180,7 +181,7 @@ class Command(BaseCommand):
             self.stdout.write(f'   • {empresa.nombre_empresa}')
             self.stdout.write(f'     - Usuario: {empresa.user.username}')
             self.stdout.write(f'     - Email: {empresa.correo_contacto}')
-            self.stdout.write(f'     - Password: empresa123')
+            self.stdout.write('     - Password: empresa123')
 
         self.stdout.write(f'\n👥 Total de empleados creados: {total_empleados}')
         self.stdout.write('   - Password para todos: empleado123')

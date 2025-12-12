@@ -4,10 +4,11 @@ Servicios de lógica de negocio para gestión de contraseñas
 from urllib.parse import urljoin
 
 from django.conf import settings
-from users.email.services import send_email
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
-from users.models import PasswordResetToken, CustomUser
+
+from users.email.services import send_email
+from users.models import CustomUser, PasswordResetToken
 
 
 def create_password_reset_token(user):

@@ -1,7 +1,7 @@
 """
 Servicios de lógica de negocio para autenticación
 """
-from users.models import EmpresaProfile, EmpleadoProfile
+from users.models import EmpleadoProfile, EmpresaProfile
 
 
 def get_user_profile_data(user):

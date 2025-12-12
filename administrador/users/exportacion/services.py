@@ -6,9 +6,8 @@ import os
 import re
 import zipfile
 from io import BytesIO, StringIO
-from typing import List, Tuple
-from users.models import Viaje, Gasto, EmpresaProfile, EmpleadoProfile
 
+from users.models import EmpleadoProfile, EmpresaProfile, Gasto, Viaje
 
 # ============================================================================
 # UTILIDADES
@@ -33,7 +32,7 @@ def safe_filename(filename: str, max_length: int = 50) -> str:
     return safe[:max_length]
 
 
-def calcular_dias_viaje(viaje: Viaje) -> Tuple[int, int, int]:
+def calcular_dias_viaje(viaje: Viaje) -> tuple[int, int, int]:
     """
     Calcula días totales, exentos y no exentos de un viaje.
 
@@ -231,11 +230,11 @@ def agregar_comprobante_a_zip(zip_file, gasto: Gasto, archivo_path: str, archivo
 
         return archivo_nombre
 
-    except Exception as e:
+    except Exception:
         return f"Error_archivo_gasto_{gasto.id}"
 
 
-def generar_zip_viajes_con_gastos(viajes_queryset, rol_usuario: str, empresa_nombre: str = None) -> BytesIO:
+def generar_zip_viajes_con_gastos(viajes_queryset, rol_usuario: str, empresa_nombre: str | None = None) -> BytesIO:
     """
     Genera un archivo ZIP con viajes, gastos y comprobantes.
 
@@ -261,7 +260,7 @@ def generar_zip_viajes_con_gastos(viajes_queryset, rol_usuario: str, empresa_nom
             'Fecha Gasto', 'Estado Gasto', 'Archivo Comprobante'
         ])
 
-        archivos_agregados = set()
+        archivos_agregados: set[str] = set()
 
         for viaje in viajes_queryset:
             dias_totales, dias_exentos, dias_no_exentos = calcular_dias_viaje(viaje)
@@ -339,7 +338,7 @@ def generar_zip_viajes_con_gastos(viajes_queryset, rol_usuario: str, empresa_nom
 # QUERIES PARA EXPORTACIÓN
 # ============================================================================
 
-def obtener_viajes_para_exportacion(usuario, empleado_id: int = None):
+def obtener_viajes_para_exportacion(usuario, empleado_id: int | None = None):
     """
     Obtiene viajes según el rol del usuario para exportación.
 

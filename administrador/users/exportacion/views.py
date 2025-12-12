@@ -3,26 +3,25 @@ Vistas para exportación de datos
 """
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import Viaje, EmpresaProfile, EmpleadoProfile
-from users.common.services import get_user_empresa, get_user_empleado
 from users.common.exceptions import (
-    EmpresaProfileNotFoundError,
     EmpleadoProfileNotFoundError,
-    UnauthorizedAccessError
+    EmpresaProfileNotFoundError,
+    UnauthorizedAccessError,
 )
+from users.common.services import get_user_empresa
+from users.models import EmpleadoProfile, EmpresaProfile, Viaje
 
 from .services import (
-    generar_csv_viajes_master,
-    generar_csv_viajes_empresa,
     generar_csv_viajes_con_gastos,
+    generar_csv_viajes_empresa,
+    generar_csv_viajes_master,
     generar_zip_viajes_con_gastos,
-    obtener_viajes_para_exportacion
+    obtener_viajes_para_exportacion,
 )
-
 
 # ============================================================================
 # VISTAS DE EXPORTACIÓN CSV
@@ -86,10 +85,10 @@ class ExportViajesGastosView(APIView):
     def get(self, request):
         try:
             viajes, filename_base = obtener_viajes_para_exportacion(request.user)
-        except EmpresaProfile.DoesNotExist:
-            raise EmpresaProfileNotFoundError()
-        except EmpleadoProfile.DoesNotExist:
-            raise EmpleadoProfileNotFoundError()
+        except EmpresaProfile.DoesNotExist as err:
+            raise EmpresaProfileNotFoundError() from err
+        except EmpleadoProfile.DoesNotExist as err:
+            raise EmpleadoProfileNotFoundError() from err
 
         csv_content = generar_csv_viajes_con_gastos(viajes)
 
@@ -153,10 +152,10 @@ class ExportViajesGastosZipView(APIView):
     def get(self, request):
         try:
             viajes, filename_base = obtener_viajes_para_exportacion(request.user)
-        except EmpresaProfile.DoesNotExist:
-            raise EmpresaProfileNotFoundError()
-        except EmpleadoProfile.DoesNotExist:
-            raise EmpleadoProfileNotFoundError()
+        except EmpresaProfile.DoesNotExist as err:
+            raise EmpresaProfileNotFoundError() from err
+        except EmpleadoProfile.DoesNotExist as err:
+            raise EmpleadoProfileNotFoundError() from err
 
         # Generar ZIP
         zip_buffer = generar_zip_viajes_con_gastos(

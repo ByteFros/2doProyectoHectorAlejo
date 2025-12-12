@@ -1,12 +1,12 @@
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
+from __future__ import annotations
+
+import uuid
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
-import uuid
 from django.utils.timezone import now
-from datetime import timedelta
-from django.conf import settings
 
 
 def password_reset_token_expiration_default():
@@ -47,9 +47,9 @@ class EmpresaProfile(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="empresa_profile")
     nombre_empresa = models.CharField(max_length=255)
     nif = models.CharField(max_length=50, unique=True)  # Identificación Fiscal
-    address = models.CharField(max_length=255, null=True, blank=True)  # ✅ Dirección
-    city = models.CharField(max_length=100, null=True, blank=True)  # ✅ Ciudad
-    postal_code = models.CharField(max_length=10, null=True, blank=True)  # ✅ Código Postal
+    address = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001  # Dirección
+    city = models.CharField(max_length=100, null=True, blank=True)  # noqa: DJ001  # Ciudad
+    postal_code = models.CharField(max_length=10, null=True, blank=True)  # noqa: DJ001  # Código Postal
     correo_contacto = models.EmailField()
     permisos = models.BooleanField(default=False)  # ✅ Permisos
     periodicity = models.CharField(
@@ -63,6 +63,9 @@ class EmpresaProfile(models.Model):
     force_release = models.BooleanField(default=False)
     has_pending_review_changes = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"Empresa: {self.nombre_empresa} ({self.user.username})"
+
     def delete(self, *args, **kwargs):
         """Si se elimina una empresa tambien se debe eliminar a sus empleados"""
         empleados = EmpleadoProfile.objects.filter(empresa=self)
@@ -75,9 +78,6 @@ class EmpresaProfile(models.Model):
         self.user.delete()
         super().delete(*args, **kwargs)
 
-    def __str__(self):
-        return f"Empresa: {self.nombre_empresa} ({self.user.username})"
-
     """Perfil para usuarios con rol EMPLEADO"""
 
 
@@ -89,17 +89,17 @@ class EmpleadoProfile(models.Model):
     dni = models.CharField(max_length=20, unique=True, null=True, blank=True, default=None)  # 🔹 DNI único opcional
     salario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=None)
 
-    def clean(self):
-        """Un empleado no puede pertenecer a más de una empresa"""
-        if EmpleadoProfile.objects.filter(user=self.user).exclude(id=self.id).exists():
-            raise ValidationError("Este empleado ya está registrado en otra empresa")
+    def __str__(self):
+        return f"Empleado: {self.nombre} {self.apellido} ({self.user.username})"
 
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"Empleado: {self.nombre} {self.apellido} ({self.user.username})"
+    def clean(self):
+        """Un empleado no puede pertenecer a más de una empresa"""
+        if EmpleadoProfile.objects.filter(user=self.user).exclude(id=self.id).exists():
+            raise ValidationError("Este empleado ya está registrado en otra empresa")
 
 
 class PasswordResetToken(models.Model):
@@ -107,6 +107,9 @@ class PasswordResetToken(models.Model):
     token = models.UUIDField(default=uuid.uuid4, unique=True)  # Genera un token único
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(default=password_reset_token_expiration_default)
+
+    def __str__(self) -> str:
+        return f"PasswordResetToken for {self.user.username} (expires {self.expires_at:%Y-%m-%d %H:%M})"
 
     def save(self,*args, **kwargs):
         """este token tendra 1 hora de validez"""
@@ -129,8 +132,8 @@ class Viaje(models.Model):
 
     empleado = models.ForeignKey(EmpleadoProfile, on_delete=models.CASCADE)
     empresa = models.ForeignKey(EmpresaProfile, on_delete=models.CASCADE)
-    ciudad = models.CharField(max_length=255, null=True, blank=True)
-    pais = models.CharField(max_length=255, null=True, blank=True)
+    ciudad = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    pais = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
     es_internacional = models.BooleanField(default=False,help_text="True si el país es distinto de 'España'")
     destino = models.CharField(max_length=255)
     fecha_inicio = models.DateField()
@@ -138,8 +141,8 @@ class Viaje(models.Model):
     estado = models.CharField(max_length=15, choices=ESTADO_CHOICES, default="EN_REVISION")
     fecha_solicitud = models.DateTimeField(auto_now_add=True)
     dias_viajados = models.PositiveIntegerField(default = 1)  # 🔹 Días de viaje
-    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)  # 🔹 Empresa visitada
-    motivo = models.TextField(max_length=500, default="No se ha declarado el motivo por parte del empleado")  # 🔹 Motivo del viaje
+    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001  # Empresa visitada
+    motivo = models.TextField(max_length=500, default="No se ha declarado el motivo por parte del empleado")  # noqa: DJ001  # Motivo del viaje
 
     def __str__(self):
         return f"{self.empleado.nombre} viaja a {self.destino} ({self.estado})"
@@ -154,6 +157,9 @@ class DiaViaje(models.Model):
     exento = models.BooleanField(default=True)
     revisado = models.BooleanField(default=False)
 
+    def __str__(self) -> str:
+        return f"DiaViaje {self.id} ({self.fecha})"
+
 
 class ViajeReviewSnapshot(models.Model):
     """Snapshot publicado de viajes revisados"""
@@ -164,13 +170,13 @@ class ViajeReviewSnapshot(models.Model):
     estado = models.CharField(max_length=15, choices=Viaje.ESTADO_CHOICES)
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
-    ciudad = models.CharField(max_length=255, null=True, blank=True)
-    pais = models.CharField(max_length=255, null=True, blank=True)
+    ciudad = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    pais = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
     es_internacional = models.BooleanField(default=False)
     destino = models.CharField(max_length=255)
     dias_viajados = models.PositiveIntegerField(default=1)
-    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)
-    motivo = models.TextField(max_length=500, null=True, blank=True)
+    empresa_visitada = models.CharField(max_length=255, null=True, blank=True)  # noqa: DJ001
+    motivo = models.TextField(max_length=500, null=True, blank=True)  # noqa: DJ001
     published_at = models.DateTimeField(auto_now_add=True)
     source_updated_at = models.DateTimeField(null=True, blank=True)
 
@@ -284,7 +290,7 @@ class MensajeJustificante(models.Model):
     gasto = models.ForeignKey("Gasto", on_delete=models.CASCADE, related_name="mensajes_justificante",null = True, blank=True)
     autor = models.ForeignKey("CustomUser", on_delete=models.CASCADE)
     motivo = models.TextField(max_length=500)
-    respuesta = models.TextField(max_length=500, blank=True, null=True)
+    respuesta = models.TextField(max_length=500, blank=True, null=True)  # noqa: DJ001
     archivo_justificante = models.FileField(upload_to="respuestas_justificantes/", null=True, blank=True)
     estado = models.CharField(max_length=20, choices=[("pendiente", "Pendiente"), ("aprobado", "Aprobado"), ("rechazado", "Rechazado")], default="pendiente")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -307,7 +313,7 @@ class Conversacion(models.Model):
         null=True, blank=True,
         related_name="conversaciones"
     )
-    participantes = models.ManyToManyField(
+    participantes: models.ManyToManyField[CustomUser, CustomUser] = models.ManyToManyField(
         "CustomUser",
         related_name="conversaciones"
     )

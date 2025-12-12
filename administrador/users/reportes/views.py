@@ -1,42 +1,37 @@
 """
 Vistas para reportes y analytics de viajes
 """
-from django.db.models import (
-    OuterRef, Subquery, Count, Sum, IntegerField, Value, Q
-)
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from users.common.exceptions import (
+    EmpleadoProfileNotFoundError,
+    EmpresaProfileNotFoundError,
+    UnauthorizedAccessError,
+)
+from users.common.services import (
+    get_user_empleado,
+    get_user_empresa,
+    get_visible_dias_queryset,
+    get_visible_viajes_queryset,
+)
 from users.models import (
-    EmpresaProfile,
-    Viaje,
     DiaViaje,
     EmpleadoProfile,
-    ViajeReviewSnapshot,
-    DiaViajeReviewSnapshot,
+    EmpresaProfile,
+    Viaje,
 )
 from users.serializers import (
     CompanyTripsSummarySerializer,
-    TripsPerMonthSerializer,
-    TripsTypeSerializer,
     ExemptDaysSerializer,
-    GeneralInfoSerializer
-)
-from users.common.services import (
-    get_user_empresa,
-    get_user_empleado,
-    get_visible_viajes_queryset,
-    get_visible_dias_queryset,
-)
-from users.common.exceptions import (
-    EmpresaProfileNotFoundError,
-    EmpleadoProfileNotFoundError,
-    UnauthorizedAccessError
+    GeneralInfoSerializer,
+    TripsTypeSerializer,
 )
 
 
@@ -342,7 +337,7 @@ class TripsPerMonthView(APIView):
         try:
             visible_viajes = get_visible_viajes_queryset(user)
         except ValueError as exc:
-            raise UnauthorizedAccessError(str(exc))
+            raise UnauthorizedAccessError(str(exc)) from exc
 
         viajes = visible_viajes.queryset
         gastos_relation = 'gastos_snapshot' if visible_viajes.uses_snapshot else 'gasto'
@@ -423,7 +418,7 @@ class TripsTypeView(APIView):
         try:
             visible_viajes = get_visible_viajes_queryset(user)
         except ValueError as exc:
-            raise UnauthorizedAccessError(str(exc))
+            raise UnauthorizedAccessError(str(exc)) from exc
 
         viajes = visible_viajes.queryset.filter(estado='REVISADO')
 
@@ -465,7 +460,7 @@ class ExemptDaysView(APIView):
         try:
             visible_viajes = get_visible_viajes_queryset(user)
         except ValueError as exc:
-            raise UnauthorizedAccessError(str(exc))
+            raise UnauthorizedAccessError(str(exc)) from exc
 
         dias_qs = get_visible_dias_queryset(visible_viajes)
 
@@ -511,7 +506,7 @@ class GeneralInfoView(APIView):
             try:
                 visible_viajes = get_visible_viajes_queryset(user)
             except ValueError as exc:
-                raise UnauthorizedAccessError(str(exc))
+                raise UnauthorizedAccessError(str(exc)) from exc
             viajes_qs = visible_viajes.queryset.filter(estado='REVISADO')
 
         # EMPLEADO: sólo él
@@ -524,7 +519,7 @@ class GeneralInfoView(APIView):
             try:
                 visible_viajes = get_visible_viajes_queryset(user)
             except ValueError as exc:
-                raise UnauthorizedAccessError(str(exc))
+                raise UnauthorizedAccessError(str(exc)) from exc
             viajes_qs = visible_viajes.queryset.filter(estado='REVISADO')
 
         else:

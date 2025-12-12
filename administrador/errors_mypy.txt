@@ -1,0 +1,52 @@
+$ python -m mypy --config-file mypy.ini .
+administrador\settings.py:152: error: Dict entry 1 has incompatible type "str": "Path"; expected "str": "str"  [dict-item]
+users\models.py:307: error: Need type annotation for "participantes"  [var-annotated]
+users\exportacion\services.py:238: error: Incompatible default for argument "empresa_nombre" (default has type "None", argument has type "str")  [assignment]
+users\exportacion\services.py:238: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+users\exportacion\services.py:238: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase        
+users\exportacion\services.py:264: error: Need type annotation for "archivos_agregados" (hint: "archivos_agregados: set[<type>] = ...")  [var-annotated]
+users\exportacion\services.py:342: error: Incompatible default for argument "empleado_id" (default has type "None", argument has type "int")  [assignment]
+users\exportacion\services.py:342: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+users\exportacion\services.py:342: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase        
+users\common\services.py:146: error: Dict entry 0 has incompatible type "str": "EmpleadoProfile"; expected "str": "EmpresaProfile"  [dict-item] 
+users\common\services.py:212: error: Incompatible return value type (got "EmpresaProfile | bool | None", expected "bool")  [return-value]       
+users\common\services.py:216: error: Incompatible return value type (got "EmpleadoProfile | bool | None", expected "bool")  [return-value]      
+users\common\services.py:242: error: Incompatible return value type (got "EmpresaProfile | bool | None", expected "bool")  [return-value]       
+users\common\services.py:246: error: Incompatible return value type (got "EmpleadoProfile | bool | None", expected "bool")  [return-value]      
+users\common\services.py:272: error: Incompatible return value type (got "EmpresaProfile | Any | None", expected "bool")  [return-value]        
+users\common\services.py:276: error: Incompatible return value type (got "EmpleadoProfile | Any | None", expected "bool")  [return-value]       
+users\common\services.py:553: error: Incompatible types in assignment (expression has type "QuerySet[ViajeReviewSnapshot, ViajeReviewSnapshot]", variable has type "QuerySet[Viaje, Viaje]")  [assignment]
+users\common\services.py:567: error: Incompatible types in assignment (expression has type "QuerySet[ViajeReviewSnapshot, ViajeReviewSnapshot]", variable has type "QuerySet[Viaje, Viaje]")  [assignment]
+users\viajes\services.py:347: error: Unsupported operand types for + ("object" and "int")  [operator]
+users\viajes\services.py:348: error: Unsupported operand types for + ("object" and "int")  [operator]
+users\viajes\services.py:349: error: Unsupported operand types for + ("object" and "int")  [operator]
+users\viajes\services.py:350: error: Unsupported operand types for + ("object" and "int")  [operator]
+users\email\services.py:75: error: Item "None" of "str | Any | None" has no attribute "rstrip"  [union-attr]
+users\common\files.py:39: error: Argument 1 to "_reset_stream" has incompatible type "UploadedFile | File[Any]"; expected "BinaryIO"  [arg-type]
+users\common\files.py:41: error: Argument 1 to "_reset_stream" has incompatible type "UploadedFile | File[Any]"; expected "BinaryIO"  [arg-type]
+users\common\files.py:42: error: Returning Any from function declared to return "bytes"  [no-any-return]
+users\common\files.py:107: error: Argument 1 to "_reset_stream" has incompatible type "File[Any]"; expected "BinaryIO"  [arg-type]
+users\common\files.py:110: error: Incompatible types in assignment (expression has type "Image | None", variable has type "ImageFile")  [assignment]
+users\common\files.py:119: error: Argument 1 to "_reset_stream" has incompatible type "File[Any]"; expected "BinaryIO"  [arg-type]
+users\common\files.py:122: error: Argument 1 to "_build_new_name" has incompatible type "str | None"; expected "str"  [arg-type]
+users\serializers.py:61: error: Need type annotation for "empresa"  [var-annotated]
+users\serializers.py:463: error: Incompatible types in assignment (expression has type "dict[str, str | date | ReturnDict[Any, Any] | int | None]", variable has type "ReturnDict[Any, Any]")  [assignment]
+users\serializers.py:510: error: Need type annotation for "autor"  [var-annotated]
+users\serializers.py:539: error: Need type annotation for "participantes"  [var-annotated]
+users\serializers.py:592: error: Need type annotation for "autor"  [var-annotated]
+users\gastos\services.py:55: error: Unsupported operand types for < ("int" and "None")  [operator]
+users\gastos\services.py:55: note: Both left and right operands are unions
+users\gastos\services.py:65: error: Incompatible default for argument "fecha_gasto" (default has type "None", argument has type "str")  [assignment]
+users\gastos\services.py:65: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True  
+users\gastos\services.py:65: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+users\gastos\services.py:93: error: Unexpected attribute "descripcion" for model "Gasto"  [misc]
+users\gastos\services.py:139: error: "Gasto" has no attribute "descripcion"  [attr-defined]
+users\gastos\services.py:227: error: Returning Any from function declared to return "bool"  [no-any-return]
+users\empresas\services.py:162: error: Incompatible default for argument "username" (default has type "None", argument has type "str")  [assignment]
+users\empresas\services.py:162: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+users\empresas\services.py:162: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+users\empresas\serializers.py:82: error: List item 0 has incompatible type "Callable[[str], str]"; expected "Callable[[str], None] | ContextValidator[str]"  [list-item]
+users\empresas\serializers.py:108: error: List item 0 has incompatible type "Callable[[str], str]"; expected "Callable[[str], None] | ContextValidator[str]"  [list-item]
+users\authentication\views.py:18: error: Incompatible types in assignment (expression has type "list[type[AllowAny]]", base class "TokenViewBase" defined the type as "tuple[()]")  [assignment]
+Found 40 errors in 12 files (checked 137 source files)
+(.venv) 

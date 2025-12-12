@@ -1,11 +1,21 @@
 """
 Servicios de lógica de negocio para viajes
 """
-from datetime import datetime, date, timedelta
-from typing import Dict, List
+from datetime import date, datetime, timedelta
+from typing import TypedDict
+
 from django.db import transaction
-from users.models import Viaje, EmpleadoProfile, DiaViaje, Gasto
+
 from users.common.services import mark_company_review_pending
+from users.models import DiaViaje, EmpleadoProfile, Gasto, Viaje
+
+
+class CityStat(TypedDict):
+    city: str
+    trips: int
+    days: int
+    nonExemptDays: int
+    exemptDays: int
 
 
 # ============================================================================
@@ -29,8 +39,8 @@ def validar_fechas(fecha_inicio_str: str, fecha_fin_str: str) -> tuple:
     try:
         fecha_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d").date()
         fecha_fin = datetime.strptime(fecha_fin_str, "%Y-%m-%d").date()
-    except (ValueError, TypeError):
-        raise ValueError("Formato de fecha inválido. Usa YYYY-MM-DD.")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Formato de fecha inválido. Usa YYYY-MM-DD.") from exc
 
     if fecha_fin < fecha_inicio:
         raise ValueError("La fecha de fin no puede ser anterior a la fecha de inicio.")
@@ -102,7 +112,7 @@ def crear_viaje(
 # SERVICIOS DE DÍAS DE VIAJE
 # ============================================================================
 
-def crear_dias_viaje(viaje: Viaje) -> List[DiaViaje]:
+def crear_dias_viaje(viaje: Viaje) -> list[DiaViaje]:
     """
     Crea objetos DiaViaje para cada día del viaje.
 
@@ -126,7 +136,7 @@ def crear_dias_viaje(viaje: Viaje) -> List[DiaViaje]:
 
 
 @transaction.atomic
-def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> List[DiaViaje]:
+def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> list[DiaViaje]:
     """
     Crea e inicializa DiaViaje para viajes ya revisados (uso en scripts).
 
@@ -164,9 +174,9 @@ def inicializar_dias_viaje_finalizado(viaje: Viaje, exentos: bool = True) -> Lis
 @transaction.atomic
 def procesar_revision_viaje(
     viaje: Viaje,
-    dias_data: List[Dict],
+    dias_data: list[dict],
     usuario
-) -> Dict:
+) -> dict:
     """
     Procesa la revisión de un viaje, actualizando días y gastos.
 
@@ -238,8 +248,8 @@ def cambiar_estado_viaje(
     viaje: Viaje,
     target_state: str,
     usuario,
-    dias_data: List[Dict] | None = None
-) -> Dict:
+    dias_data: list[dict] | None = None
+) -> dict:
     """
     Maneja las transiciones permitidas de estado para un viaje.
 
@@ -309,7 +319,7 @@ def cambiar_estado_viaje(
 # QUERIES Y ESTADÍSTICAS
 # ============================================================================
 
-def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> List[Dict]:
+def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> list[CityStat]:
     """
     Obtiene estadísticas de ciudades visitadas por un empleado.
 
@@ -324,7 +334,7 @@ def obtener_estadisticas_ciudades(empleado: EmpleadoProfile) -> List[Dict]:
         estado='REVISADO'
     )
 
-    city_stats = {}
+    city_stats: dict[str, CityStat] = {}
 
     for viaje in viajes:
         ciudad = viaje.ciudad or viaje.destino.split(',')[0].strip()

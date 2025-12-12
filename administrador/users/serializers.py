@@ -1,10 +1,26 @@
+import re
+from typing import Any
+
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
-import re
-from .models import CustomUser, EmpresaProfile, EmpleadoProfile, Gasto, Viaje, Notificacion, Notas, MensajeJustificante, \
-    DiaViaje, Conversacion, Mensaje, ViajeReviewSnapshot, GastoReviewSnapshot
+
 from users.common.files import compress_if_image
+
+from .models import (
+    Conversacion,
+    CustomUser,
+    DiaViaje,
+    EmpleadoProfile,
+    EmpresaProfile,
+    Gasto,
+    GastoReviewSnapshot,
+    Mensaje,
+    MensajeJustificante,
+    Notas,
+    Notificacion,
+    Viaje,
+)
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
@@ -58,7 +74,7 @@ EMAIL_UNICODE_REGEX = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', re.UNICODE)
 
 
 class EmpleadoProfileSerializer(serializers.ModelSerializer):
-    empresa = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
+    empresa: serializers.StringRelatedField = serializers.StringRelatedField(source="empresa.nombre_empresa", read_only=True)
     empresa_id = serializers.IntegerField(source="empresa.id", read_only=True)
     email = serializers.CharField(source="user.email", required=False)
     user_id = serializers.IntegerField(source="user.id", read_only=True)
@@ -286,64 +302,7 @@ class NotaViajeSerializer(serializers.ModelSerializer):
 
 
 class ViajeSerializer(serializers.ModelSerializer):
-    """Serializador para manejar viajes y cálculo automático de días"""
-
-    empleado_id = serializers.IntegerField(write_only=True)
-    empresa_id = serializers.IntegerField(write_only=True)
-    empresa = EmpresaProfileSerializer(read_only=True)
-    empleado = EmpleadoProfileSerializer(read_only=True)
-    dias_viajados = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = Viaje
-        fields = [
-            'id', 'empleado', 'empresa', 'destino',
-            'fecha_inicio', 'fecha_fin', 'estado', 'fecha_solicitud',
-            'empleado_id', 'empresa_id', 'empresa_visitada', 'motivo',
-            'dias_viajados'
-        ]
-
-    def create(self, validated_data):
-        empleado_id = validated_data.pop('empleado_id')
-        empresa_id = validated_data.pop('empresa_id')
-
-        empleado = EmpleadoProfile.objects.get(id=empleado_id)
-        empresa = EmpresaProfile.objects.get(id=empresa_id)
-
-        # Calcular días de viaje inclusivos
-        fecha_inicio = validated_data.get('fecha_inicio')
-        fecha_fin = validated_data.get('fecha_fin')
-        dias = (fecha_fin - fecha_inicio).days + 1
-
-        # Verificación de duplicados y validaciones de motivo
-        motivo = validated_data.get('motivo', '')
-        if motivo and len(motivo) > 500:
-            raise serializers.ValidationError({'motivo': 'El motivo no puede superar los 500 caracteres'})
-
-        existe = Viaje.objects.filter(
-            empresa=empresa,
-            destino=validated_data.get('destino'),
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            estado__in=['EN_REVISION', 'REABIERTO']
-        ).exists()
-        if existe:
-            raise serializers.ValidationError(
-                {'error': 'Ya existe un viaje pendiente a este destino en estas fechas para la empresa.'}
-            )
-
-        viaje = Viaje.objects.create(
-            empleado=empleado,
-            empresa=empresa,
-            dias_viajados=dias,
-            **validated_data
-        )
-        return viaje
-
-
-
-"""2do serializer para manejar viajes y cálculo automático de días con destino y país"""
-class ViajeSerializer(serializers.ModelSerializer):
+    """Serializador para manejar viajes y cálculo automático de días con destino y país"""
     empleado_id = serializers.IntegerField(write_only=True, required=False)
     empresa_id = serializers.IntegerField(write_only=True, required=False)
     empleado = EmpleadoProfileSerializer(read_only=True)
@@ -396,7 +355,7 @@ class ViajeSerializer(serializers.ModelSerializer):
         # Normalize country for Spanish aliases
         pais_norm = pais.strip().lower()
         nacional_aliases = ('españa', 'espana', 'spain')
-        es_int = not (pais_norm in nacional_aliases)
+        es_int = pais_norm not in nacional_aliases
 
         # 5) Días de viaje
         fecha_inicio = validated_data['fecha_inicio']
@@ -513,6 +472,7 @@ class GastoSnapshotSerializer(serializers.Serializer):
         gasto = getattr(snapshot, 'gasto', None)
         request = self.context.get('request') if isinstance(self.context, dict) else None
 
+        data: dict[str, Any]
         if gasto:
             data = GastoSerializer(gasto, context={'request': request}).data
         else:
@@ -564,7 +524,7 @@ class NotificacionSerializer(serializers.ModelSerializer):
 
 
 class MensajeJustificanteSerializer(serializers.ModelSerializer):
-    autor = serializers.StringRelatedField(read_only=True)
+    autor: serializers.StringRelatedField = serializers.StringRelatedField(read_only=True)
     archivo_justificante_url = serializers.SerializerMethodField()
     gasto_id = serializers.IntegerField(source='gasto.id', read_only=True)
     remitente = serializers.SerializerMethodField()
@@ -593,7 +553,7 @@ class MensajeJustificanteSerializer(serializers.ModelSerializer):
         return data
 
 class ConversacionSerializer(serializers.ModelSerializer):
-    participantes = serializers.StringRelatedField(many=True)
+    participantes: serializers.StringRelatedField = serializers.StringRelatedField(many=True)
     last_message = serializers.SerializerMethodField()
     has_unread = serializers.SerializerMethodField()
 
@@ -646,7 +606,7 @@ class ConversacionSerializer(serializers.ModelSerializer):
         return last_message.fecha_creacion > lectura.last_read_at
 
 class MensajeSerializer(serializers.ModelSerializer):
-    autor = serializers.StringRelatedField()
+    autor: serializers.StringRelatedField = serializers.StringRelatedField()
     autor_id = serializers.IntegerField(source='autor.id', read_only=True)
     archivo = serializers.FileField(read_only=True)
 

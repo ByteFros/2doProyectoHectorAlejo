@@ -3,7 +3,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from users.models import Conversacion, Mensaje, CustomUser, Viaje, Gasto
+from users.models import Conversacion, CustomUser, Gasto, Mensaje, Viaje
 
 
 class Command(BaseCommand):

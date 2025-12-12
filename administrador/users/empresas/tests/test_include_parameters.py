@@ -3,12 +3,13 @@ Tests para los query parameters 'include' en ViewSets de empresas y empleados.
 Prueba la funcionalidad de carga anidada (nested loading) de datos relacionados.
 """
 from datetime import date, timedelta
+
 from django.test import TestCase
 from rest_framework import status
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje
+from users.models import CustomUser, EmpleadoProfile, EmpresaProfile, Viaje
 
 # Base URL para todos los endpoints
 API_BASE_URL = '/api/users'
@@ -413,9 +414,7 @@ class IncludeParameterPerformanceTest(IncludeParameterTestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         # Django's assertNumQueries context manager
-        from django.test.utils import override_settings
         from django.db import connection
-        from django.conf import settings
 
         with self.settings(DEBUG=True):
             connection.queries_log.clear()
@@ -431,7 +430,6 @@ class IncludeParameterPerformanceTest(IncludeParameterTestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.master_token}')
 
         from django.db import connection
-        from django.conf import settings
 
         with self.settings(DEBUG=True):
             connection.queries_log.clear()

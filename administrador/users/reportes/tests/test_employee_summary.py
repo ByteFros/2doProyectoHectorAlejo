@@ -1,12 +1,13 @@
-from django.test import TestCase
-from django.urls import reverse
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.test import APIClient
-from rest_framework import status
-from django.utils import timezone
 from datetime import timedelta
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, Viaje, DiaViaje
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from users.models import CustomUser, DiaViaje, EmpleadoProfile, EmpresaProfile, Viaje
 
 
 class EmployeeSummaryReportTests(TestCase):

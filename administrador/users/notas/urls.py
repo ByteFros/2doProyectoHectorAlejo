@@ -2,10 +2,8 @@
 URLs del módulo de notas
 """
 from django.urls import path
-from .views import (
-    NotaViajeListCreateView,
-    NotaViajeDeleteView
-)
+
+from .views import NotaViajeDeleteView, NotaViajeListCreateView
 
 urlpatterns = [
     # Gestión de notas de viajes

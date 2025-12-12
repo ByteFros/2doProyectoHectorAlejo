@@ -3,18 +3,15 @@ Vistas para gestión de notas de viajes
 """
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import Notas, Viaje, EmpleadoProfile
-from users.serializers import NotaViajeSerializer
+from users.common.exceptions import EmpleadoProfileNotFoundError, UnauthorizedAccessError
 from users.common.services import get_user_empleado
-from users.common.exceptions import (
-    EmpleadoProfileNotFoundError,
-    UnauthorizedAccessError
-)
+from users.models import Notas, Viaje
+from users.serializers import NotaViajeSerializer
 
 
 class NotaViajeListCreateView(APIView):

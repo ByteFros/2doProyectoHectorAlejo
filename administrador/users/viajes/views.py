@@ -5,40 +5,37 @@ from django.db import transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import status
-from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from users.models import Viaje, EmpleadoProfile, EmpresaProfile, DiaViaje, Gasto
-from users.serializers import (
-    ViajeSerializer,
-    PendingTripSerializer,
-    DiaViajeSerializer,
-    ViajeWithGastosSerializer,
-    EmpleadoProfileSerializer,
-    EmpresaProfileSerializer,
-    ViajeSnapshotSerializer,
-    GastoSerializer,
-    GastoSnapshotSerializer,
+from users.common.exceptions import (
+    EmpleadoProfileNotFoundError,
+    EmpresaProfileNotFoundError,
+    UnauthorizedAccessError,
 )
 from users.common.services import (
     get_user_empleado,
     get_user_empresa,
     get_visible_viajes_queryset,
-    get_visible_gastos_queryset,
 )
-from users.common.exceptions import (
-    EmpleadoProfileNotFoundError,
-    EmpresaProfileNotFoundError,
-    UnauthorizedAccessError
+from users.models import DiaViaje, EmpleadoProfile, EmpresaProfile, Gasto, Viaje
+from users.serializers import (
+    DiaViajeSerializer,
+    EmpleadoProfileSerializer,
+    EmpresaProfileSerializer,
+    PendingTripSerializer,
+    ViajeSerializer,
+    ViajeSnapshotSerializer,
+    ViajeWithGastosSerializer,
 )
 
 from .services import (
-    validar_fechas,
+    cambiar_estado_viaje,
     crear_viaje,
     obtener_estadisticas_ciudades,
-    cambiar_estado_viaje
+    validar_fechas,
 )
 
 

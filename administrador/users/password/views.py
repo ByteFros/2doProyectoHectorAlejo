@@ -7,18 +7,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import (
-    PasswordResetRequestSerializer,
+    ChangePasswordSerializer,
     PasswordResetConfirmSerializer,
-    ChangePasswordSerializer
+    PasswordResetRequestSerializer,
 )
 from .services import (
-    get_user_by_email,
+    change_user_password,
     create_password_reset_token,
+    delete_reset_token,
+    get_user_by_email,
+    reset_user_password,
     send_password_reset_email,
     validate_reset_token,
-    reset_user_password,
-    delete_reset_token,
-    change_user_password
 )
 
 

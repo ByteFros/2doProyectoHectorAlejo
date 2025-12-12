@@ -2,10 +2,8 @@
 URLs del módulo de notificaciones
 """
 from django.urls import path
-from .views import (
-    ListaNotificacionesView,
-    CrearNotificacionView
-)
+
+from .views import CrearNotificacionView, ListaNotificacionesView
 
 urlpatterns = [
     # Gestión de notificaciones

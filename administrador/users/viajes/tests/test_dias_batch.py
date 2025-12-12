@@ -1,12 +1,12 @@
 from datetime import date
 
-from django.urls import reverse
 from django.test import TestCase
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import CustomUser, EmpresaProfile, EmpleadoProfile, DiaViaje, Gasto
+from users.models import CustomUser, DiaViaje, EmpleadoProfile, EmpresaProfile, Gasto
 from users.viajes.services import crear_viaje
 
 

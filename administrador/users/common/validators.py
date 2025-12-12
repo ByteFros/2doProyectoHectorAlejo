@@ -2,9 +2,8 @@
 Validadores comunes para DNI/NIF español y otros documentos de identidad
 """
 import re
-from typing import Tuple
-from rest_framework import serializers
 
+from rest_framework import serializers
 
 # ============================================================================
 # CONSTANTES
@@ -22,7 +21,7 @@ NIE_REPLACE = {'X': '0', 'Y': '1', 'Z': '2'}
 # VALIDADORES DE FORMATO
 # ============================================================================
 
-def validate_dni_format(dni: str) -> Tuple[bool, str]:
+def validate_dni_format(dni: str) -> tuple[bool, str]:
     """
     Valida el formato y letra de control de un DNI español.
 
@@ -62,7 +61,7 @@ def validate_dni_format(dni: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def validate_nie_format(nie: str) -> Tuple[bool, str]:
+def validate_nie_format(nie: str) -> tuple[bool, str]:
     """
     Valida el formato y letra de control de un NIE español.
 
@@ -103,7 +102,7 @@ def validate_nie_format(nie: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def validate_nif_format(nif: str) -> Tuple[bool, str]:
+def validate_nif_format(nif: str) -> tuple[bool, str]:
     """
     Valida el formato de un NIF empresarial español.
 
@@ -142,7 +141,7 @@ def validate_nif_format(nif: str) -> Tuple[bool, str]:
     return True, ""
 
 
-def validate_dni_nie_nif(documento: str) -> Tuple[bool, str]:
+def validate_dni_nie_nif(documento: str) -> tuple[bool, str]:
     """
     Valida un documento que puede ser DNI, NIE o NIF.
     Intenta validar en ese orden.
